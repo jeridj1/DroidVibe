@@ -1,0 +1,4 @@
+{
+  "platforms": ["android"],
+  "app": ["android/src/main/AndroidManifest.xml"]
+}
