@@ -88,9 +88,7 @@ jobs:
       - name: Expo prebuild
         working-directory: apps/mobile
         run: |
-          pnpm exec expo prebuild \
-            --platform android \
-            --no-install --clean 2>&1 | tee prebuild.log
+          pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -99,14 +97,12 @@ jobs:
       - name: Report error
         if: failure()
         env:
-          GH_TOKEN: ${GITHUB_TOKEN}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Prebuild failed" > /tmp/issue.md
           echo "See prebuild-log artifact" >> /tmp/issue.md
           tail -80 apps/mobile/prebuild.log >> /tmp/issue.md
-          gh issue create \
-            --title "CI: Prebuild failed" \
-            --body-file /tmp/issue.md || true
+          gh issue create --title "CI: Prebuild failed" --body-file /tmp/issue.md || true
 
   apk-build:
     name: Build Android APK
@@ -129,46 +125,43 @@ jobs:
           java-version: '17'
       - run: pnpm install --no-frozen-lockfile
       - name: SDK licenses
-        run: |
-          yes | ${ANDROID_HOME}/cmdline-tools \
-            /latest/bin/sdkmanager \
-            --licenses > /dev/null 2>&1 || true
+        run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install SDK components
-        run: |
-          ${ANDROID_HOME}/cmdline-tools \
-            /latest/bin/sdkmanager \
-            'platforms;android-35' \
-            'build-tools;35.0.0' \
-            'platform-tools' \
-            'ndk;27.0.12077973' \
-            'cmake;3.22.1' 2>/dev/null || true
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'ndk;27.0.12077973' 'cmake;3.22.1' 2>/dev/null || true
       - name: Expo prebuild
         working-directory: apps/mobile
         run: |
-          pnpm exec expo prebuild \
-            --platform android \
-            --no-install --clean
+          pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild-apk.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prebuild-apk-log
+          path: apps/mobile/prebuild-apk.log
       - name: Patch Kotlin version
         working-directory: apps/mobile/android
+        if: success()
         run: |
           if [ -f gradle.properties ]; then
-            sed -i s/kotlinVersion=.*/kotlinVersion=1.9.25/ \
-              gradle.properties
+            sed -i 's/kotlinVersion=.*/kotlinVersion=1.9.25/' gradle.properties
           else
-            echo kotlinVersion=1.9.25 >> gradle.properties
+            echo "kotlinVersion=1.9.25" >> gradle.properties
+          fi
+          if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
+            echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
+          fi
+          if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
+            echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
           fi
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon \
-            --stacktrace 2>&1 | tee gradle-build.log
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
       - name: Show errors
         working-directory: apps/mobile/android
         if: always()
         run: |
-          grep -E "^e: |error:" gradle-build.log \
-            | head -50 || true
+          grep -E "^e: |error:" gradle-build.log | head -50 || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -181,3 +174,12 @@ jobs:
           name: gradle-build-log
           path: apps/mobile/android/gradle-build.log
           retention-days: 14
+      - name: Report APK build error
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "APK build failed" > /tmp/issue.md
+          echo "Commit: ${{ github.sha }}" >> /tmp/issue.md
+          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue.md
+          gh issue create --title "CI: APK build failed" --body-file /tmp/issue.md || true
