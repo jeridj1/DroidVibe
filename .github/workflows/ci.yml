@@ -8,13 +8,13 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   quality:
     name: Typecheck & Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,47 +24,32 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm lint
+      - name: Run typecheck + lint (capture)
+        run: |
+          set +e
+          pnpm typecheck > typecheck.log 2>&1
+          tc=$?
+          pnpm lint > lint.log 2>&1
+          lc=$?
+          {
+            echo "## Typecheck (exit ${tc})"
+            echo '```'
+            cat typecheck.log
+            echo '```'
+            echo "## Lint (exit ${lc})"
+            echo '```'
+            cat lint.log
+            echo '```'
+          } > combined.log
+          if [ "${tc}" -ne 0 ] || [ "${lc}" -ne 0 ]; then
+            gh issue create --title "CI: Typecheck/Lint failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   web-build:
     name: Build Web Backend
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: quality
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm --filter @droidvibe/web build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: packages/web/dist
-
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: quality
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm test
-
-  mobile-prebuild:
-    name: Expo Prebuild Validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: quality
@@ -77,6 +62,74 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Expo prebuild (Android)
+      - name: Build web (capture)
+        run: |
+          set +e
+          pnpm --filter @droidvibe/web build > build.log 2>&1
+          b=$?
+          if [ "${b}" -ne 0 ]; then
+            { echo '## Web build (exit '${b}')'; echo '```'; cat build.log; echo '```'; } > combined.log
+            gh issue create --title "CI: Web build failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: packages/web/dist
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pnpm install --no-frozen-lockfile
+      - name: Run tests (capture)
+        run: |
+          set +e
+          pnpm test > test.log 2>&1
+          t=$?
+          if [ "${t}" -ne 0 ]; then
+            { echo '## Tests (exit '${t}')'; echo '```'; cat test.log; echo '```'; } > combined.log
+            gh issue create --title "CI: Test failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  mobile-prebuild:
+    name: Expo Prebuild Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pnpm install --no-frozen-lockfile
+      - name: Expo prebuild (Android, capture)
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean
+        run: |
+          set +e
+          pnpm exec expo prebuild --platform android --no-install --clean > prebuild.log 2>&1
+          p=$?
+          if [ "${p}" -ne 0 ]; then
+            { echo '## Expo prebuild (exit '${p}')'; echo '```'; cat prebuild.log; echo '```'; } > combined.log
+            gh issue create --title "CI: Expo prebuild failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
