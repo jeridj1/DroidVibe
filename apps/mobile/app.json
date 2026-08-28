@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "DroidVibe",
+    "slug": "droidvibe",
+    "scheme": "droidvibe",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.droidvibe.app",
+      "minSdkVersion": 24,
+      "targetSdkVersion": 35,
+      "edgeToEdgeEnabled": true,
+      "permissions": ["android.hardware.usb.host"],
+      "features": [
+        { "name": "android.hardware.usb.host", "required": false }
+      ]
+    },
+    "plugins": ["../../packages/native-usb"],
+    "experiments": {
+      "tsrPaths": true
+    },
+    "ios": { "supportsTablet": true }
+  }
+}

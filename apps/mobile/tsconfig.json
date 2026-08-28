@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["react-native"],
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "composite": true
+  },
+  "include": ["app/**/*", "src/**/*"]
+}
