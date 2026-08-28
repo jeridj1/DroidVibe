@@ -17,11 +17,6 @@ describe('Intel HEX', () => {
   });
 
   it('handles EOF and extended linear address records', () => {
-    const text = [
-      ':020000040001F9', // ext linear addr -> base 0x00010000
-      ':040000000102030404', // data at 0x00010000, checksum corrected below
-      ':00000001FF',
-    ].join('\n');
     // compute correct checksums
     const r0 = ':020000040001F9';
     const r1 = ':0400000001020304' + checksumOf([0x04, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04]);
