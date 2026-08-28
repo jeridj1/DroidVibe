@@ -153,6 +153,17 @@ jobs:
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
+      - name: Patch Kotlin version for Compose Compiler compatibility
+        working-directory: apps/mobile/android
+        run: |
+          if [ -f gradle.properties ]; then
+            sed -i 's/kotlinVersion=.*/kotlinVersion=1.9.25/' gradle.properties
+            echo "Patched Kotlin version to 1.9.25"
+            grep -i kotlin gradle.properties || true
+          else
+            echo "kotlinVersion=1.9.25" >> gradle.properties
+            echo "Added Kotlin version 1.9.25"
+          fi
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
