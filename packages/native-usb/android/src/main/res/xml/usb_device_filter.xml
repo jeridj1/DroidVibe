@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Generic: matches any device; permission is requested per-device at runtime. -->
+    <usb-device />
+</resources>
