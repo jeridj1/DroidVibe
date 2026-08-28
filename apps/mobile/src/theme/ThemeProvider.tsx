@@ -18,9 +18,13 @@ interface ThemeCtx {
 
 const Ctx = createContext<ThemeCtx | null>(null);
 
-const STORAGE_KEY = 'droidvibe.theme';
-const TEXT_SCALE_KEY = 'droidvibe.textScale';
-const TWO_PANE_KEY = 'droidvibe.twoPane';
+const STORAGE_KEY = '@droidvibe/theme';
+
+interface StoredPrefs {
+  mode: ThemeMode;
+  textScale: number;
+  twoPane: boolean;
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
@@ -29,44 +33,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [twoPane, setTwoPane] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Restore persisted preferences on mount
+  // Load saved preferences on mount
   useEffect(() => {
     (async () => {
       try {
-        const [savedMode, savedScale, savedTwoPane] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(TEXT_SCALE_KEY),
-          AsyncStorage.getItem(TWO_PANE_KEY),
-        ]);
-        if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
-          setMode(savedMode);
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const prefs = JSON.parse(raw) as StoredPrefs;
+          if (prefs.mode === 'light' || prefs.mode === 'dark' || prefs.mode === 'system') setMode(prefs.mode);
+          if (typeof prefs.textScale === 'number' && prefs.textScale > 0) setTextScale(prefs.textScale);
+          if (typeof prefs.twoPane === 'boolean') setTwoPane(prefs.twoPane);
         }
-        if (savedScale) {
-          const n = parseFloat(savedScale);
-          if (!isNaN(n) && n >= 0.75 && n <= 1.5) setTextScale(n);
-        }
-        if (savedTwoPane === 'true') setTwoPane(true);
       } catch {
-        // AsyncStorage not available (Expo Go without the module) — fall back to defaults
+        // ignore — use defaults
+      } finally {
+        setLoaded(true);
       }
-      setLoaded(true);
     })();
   }, []);
 
-  // Persist mode when it changes
+  // Persist preferences when they change (after initial load)
   useEffect(() => {
-    if (loaded) AsyncStorage.setItem(STORAGE_KEY, mode).catch(() => {});
-  }, [mode, loaded]);
-
-  // Persist textScale
-  useEffect(() => {
-    if (loaded) AsyncStorage.setItem(TEXT_SCALE_KEY, String(textScale)).catch(() => {});
-  }, [textScale, loaded]);
-
-  // Persist twoPane
-  useEffect(() => {
-    if (loaded) AsyncStorage.setItem(TWO_PANE_KEY, String(twoPane)).catch(() => {});
-  }, [twoPane, loaded]);
+    if (!loaded) return;
+    const prefs: StoredPrefs = { mode, textScale, twoPane };
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)).catch(() => {});
+  }, [mode, textScale, twoPane, loaded]);
 
   const resolved: 'light' | 'dark' = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const palette = useMemo(() => (resolved === 'dark' ? dark : light), [resolved]);

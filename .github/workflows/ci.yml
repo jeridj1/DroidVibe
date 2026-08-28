@@ -155,40 +155,44 @@ jobs:
         run: pnpm exec expo prebuild --platform android --no-install --clean
       - name: Build debug APK
         working-directory: apps/mobile/android
-        shell: bash
         run: |
           set -o pipefail
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
-      - name: Upload APK artifact
-        if: success()
-        uses: actions/upload-artifact@v4
+      - name: Show Kotlin compiler errors
+        working-directory: apps/mobile/android
+        if: always()
+        run: |
+          grep -E "^e: |error:|Unresolved reference" gradle-build.log | head -50 || echo "No Kotlin error lines found"
+      - name: Show Gradle build log (last 100 lines)
+        working-directory: apps/mobile/android
+        if: always()
+        run: tail -100 gradle-build.log || true
+      - uses: actions/upload-artifact@v4
         with:
           name: droidvibe-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
-          retention-days: 30
-      - name: Upload gradle log
+          retention-days: 14
         if: always()
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: gradle-build-log
           path: apps/mobile/android/gradle-build.log
-          retention-days: 30
-      - name: Report gradle failure as issue
+          retention-days: 14
+        if: always()
+      - name: Report failure as issue
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo 'Gradle `assembleDebug` failed.'
-            echo ''
-            echo '## Kotlin compilation errors'
+            echo '## Gradle Build Log (Kotlin errors)'
             echo '```'
-            grep -E '^e: |error:|Unresolved reference|cannot find|FAILURE|What went wrong' apps/mobile/android/gradle-build.log 2>/dev/null | head -80 || echo "no errors found in grep"
+            grep -E "^e: |error:|Unresolved reference" apps/mobile/android/gradle-build.log 2>/dev/null | head -50 || echo "No Kotlin error lines found"
             echo '```'
-            echo ''
-            echo '## Last 200 lines of build log'
+            echo ""
+            echo '## Last 100 lines'
             echo '```'
-            tail -200 apps/mobile/android/gradle-build.log 2>/dev/null || echo "no gradle-build.log found"
+            tail -100 apps/mobile/android/gradle-build.log 2>/dev/null || true
             echo '```'
             echo ""
             echo "Commit: ${{ github.sha }}"

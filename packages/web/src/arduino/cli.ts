@@ -37,6 +37,7 @@ function runCli(args: string[], opts: { cwd?: string; env?: Record<string, strin
 
 /** Core/board management: ensure a board core is installed for an FQBN. */
 export async function ensureCoreInstalled(fqbn: string): Promise<void> {
+  // fqbn like "arduino:avr:uno" -> core id "arduino:avr"
   const parts = fqbn.split(':');
   if (parts.length < 2) return;
   const core = parts.slice(0, 2).join(':');
@@ -74,7 +75,7 @@ export async function prepareSketchJob(
   return { jobDir, sketchDir, inoPath };
 }
 
-/** Compile a sketch, returning the parsed result + firmware data on success. */
+/** Compile a sketch, returning the parsed result + firmware path/base64 on success. */
 export async function compileSketch(
   inoPath: string,
   fqbn: string,
@@ -82,7 +83,7 @@ export async function compileSketch(
   ok: boolean;
   stdout: string;
   firmwarePath: string | null;
-  firmwareBase64: string | null;
+  firmwareBase64?: string;
   durationMs: number;
 }> {
   await ensureCoreInstalled(fqbn);
@@ -99,23 +100,35 @@ export async function compileSketch(
   const durationMs = Date.now() - start;
   const ok = r.code === 0;
   let firmwarePath: string | null = null;
-  let firmwareBase64: string | null = null;
+  let firmwareBase64: string | undefined;
+
   if (ok) {
+    // arduino-cli writes <name>.hex (AVR) or <name>.bin in the build path.
+    // Scan the build directory for firmware artifacts.
     try {
       const entries = await readdir(buildDir);
-      const uf2 = entries.find((f) => f.endsWith('.uf2'));
-      const hex = entries.find((f) => f.endsWith('.hex'));
-      const bin = entries.find((f) => f.endsWith('.bin') && !f.endsWith('.elf.bin') && !f.endsWith('.map'));
-      const artifact = uf2 ?? hex ?? bin;
-      if (artifact) {
-        firmwarePath = join(buildDir, artifact);
-        const data = await readFile(firmwarePath);
-        firmwareBase64 = data.toString('base64');
+      // Priority: .hex (AVR), .uf2 (RP2040), .bin (ARM/ESP)
+      const fwFile =
+        entries.find((f) => f.endsWith('.hex')) ??
+        entries.find((f) => f.endsWith('.uf2')) ??
+        entries.find((f) => f.endsWith('.bin') && !f.endsWith('.bin.json'));
+      if (fwFile) {
+        const fwPath = join(buildDir, fwFile);
+        firmwarePath = fwPath;
+        const fwBuffer = await readFile(fwPath);
+        firmwareBase64 = fwBuffer.toString('base64');
       }
     } catch {
-      // Could not read firmware
+      // Fallback: try to get path from JSON output
+      try {
+        const parsed = JSON.parse(r.stdout || '{}');
+        firmwarePath = parsed.build_path ? join(parsed.build_path, 'firmware.hex') : null;
+      } catch {
+        firmwarePath = join(buildDir, 'firmware.hex');
+      }
     }
   }
+
   return { ok, stdout: r.output, firmwarePath, firmwareBase64, durationMs };
 }
 

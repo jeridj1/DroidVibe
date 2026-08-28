@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -14,15 +14,10 @@ import { useTheme } from '@/src/theme/ThemeProvider';
 import { CodeEditor } from '@/src/components/CodeEditor';
 import { Button, Badge, Row, SectionTitle, Card } from '@/src/components/ui';
 import { api } from '@/src/lib/api';
-import {
-  listDevices,
-  requestPermission,
-  upload,
-  flashUf2,
-  isNativeUsbAvailable,
-} from '@/src/lib/transport';
+import { listDevices, upload, flashUf2, isNativeUsbAvailable } from '@/src/lib/transport';
 import { identifyBoard } from '@droidvibe/shared';
-import type { Diagnostic, UsbDevice, UploadProgress } from '@droidvibe/shared';
+import { consumePendingSketch } from '@/src/lib/sketchBridge';
+import type { Diagnostic, UsbDevice, UploadProtocol, UploadProgress } from '@droidvibe/shared';
 
 const DEFAULT_CODE = `// DroidVibe — Blink
 void setup() {
@@ -46,20 +41,6 @@ const BOARDS = [
   { fqbn: 'esp32:esp32:esp32', name: 'ESP32' },
 ];
 
-const STAGE_LABELS: Record<string, string> = {
-  idle: 'Idle',
-  compiling: 'Compiling…',
-  compiled: 'Compiled',
-  detected: 'Select device',
-  selected: 'Connecting…',
-  connected: 'Connected',
-  uploading: 'Uploading…',
-  verifying: 'Verifying…',
-  verified: 'Verified',
-  done: 'Done',
-  failed: 'Failed',
-};
-
 export default function EditorScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
@@ -70,18 +51,28 @@ export default function EditorScreen() {
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [buildStage, setBuildStage] = useState<string>('idle');
   const [progress, setProgress] = useState(0);
-  const [progressStage, setProgressStage] = useState<string>('');
   const [ai, setAi] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [firmware, setFirmware] = useState<string | null>(null);
-  const [devicePickerOpen, setDevicePickerOpen] = useState(false);
+  const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [devices, setDevices] = useState<UsbDevice[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  const [sketchName, setSketchName] = useState('Sketch');
   const nativeUsb = isNativeUsbAvailable();
+
+  // Load pending sketch from sketchBridge on mount
+  useEffect(() => {
+    const pending = consumePendingSketch();
+    if (pending) {
+      setCode(pending.code);
+      setSketchName(pending.name);
+    }
+  }, []);
 
   const boardName = BOARDS.find((b) => b.fqbn === fqbn)?.name ?? fqbn;
 
-  async function doCompile() {
+  async function doCompile(): Promise<string | null> {
     setCompiling(true);
     setBuildStage('compiling');
     setError(null);
@@ -89,97 +80,117 @@ export default function EditorScreen() {
     setAi(null);
     setFirmware(null);
     try {
-      const r = await api.compile({
-        name: 'Sketch',
+      const r = (await api.compile({
+        name: sketchName,
         fqbn,
-        files: [{ path: 'Sketch.ino', content: code }],
-      });
-      setDiagnostics((r.diagnostics as Diagnostic[]) ?? []);
+        files: [{ path: sketchName.replace(/[^A-Za-z0-9_]/g, '_') + '.ino', content: code }],
+      })) as any;
+      setDiagnostics(r.diagnostics ?? []);
       if (r.ok) {
-        setFirmware(r.firmware ?? null);
-        setBuildStage('compiled');
+        const fw = r.firmware ?? null;
+        setFirmware(fw);
+        setBuildStage(fw ? 'idle' : 'failed');
+        if (!fw) {
+          setError('Compilation succeeded but no firmware artifact was returned.');
+          return null;
+        }
+        return fw;
       } else {
         setBuildStage('failed');
+        return null;
       }
     } catch (e) {
       setError((e as Error).message);
       setBuildStage('failed');
+      return null;
     } finally {
       setCompiling(false);
     }
   }
 
-  async function openDevicePicker() {
-    if (!firmware) {
-      setError('Compile first before uploading.');
+  async function startUpload() {
+    if (!nativeUsb) {
+      setError('Native USB unavailable. Build a DroidVibe dev/production APK to access USB hardware.');
       return;
     }
     setError(null);
-    try {
-      const devs = await listDevices();
-      setDevices(devs);
-      setDevicePickerOpen(true);
-    } catch (e) {
-      setError('Failed to list USB devices: ' + (e as Error).message);
+    setUploadMsg(null);
+    // Ensure we have firmware
+    let fw = firmware;
+    if (!fw) {
+      fw = await doCompile();
     }
+    if (!fw) return;
+
+    // Open device picker
+    const devs = await listDevices();
+    setDevices(devs);
+    if (devs.length === 0) {
+      setError('No USB devices detected. Connect a board via USB-OTG.');
+      setBuildStage('failed');
+      return;
+    }
+    setShowDevicePicker(true);
   }
 
-  async function selectDevice(device: UsbDevice) {
-    setDevicePickerOpen(false);
-    setBuildStage('selected');
+  async function doUploadToDevice(device: UsbDevice) {
+    setShowDevicePicker(false);
+    let fw = firmware;
+    if (!fw) {
+      fw = await doCompile();
+      if (!fw) return;
+    }
+
     setUploading(true);
-    setError(null);
+    setBuildStage('connecting');
+    setUploadMsg(null);
     setProgress(0);
-    setProgressStage('preparing');
 
     try {
-      const granted = await requestPermission(device.id);
-      if (!granted) {
-        setError('USB permission denied for ' + (device.productName ?? device.id));
-        setBuildStage('failed');
-        setUploading(false);
-        return;
-      }
-
-      const boardId = identifyBoard(device.vendorId, device.productId);
-      const usePicoboot = device.bootsel || boardId?.protocol === 'picoboot';
-
-      const onProgress = (p: UploadProgress) => {
-        setProgressStage(p.stage);
-        setProgress(p.progress);
-        if (p.stage === 'writing') setBuildStage('uploading');
-        else if (p.stage === 'verifying') setBuildStage('verifying');
-        else if (p.stage === 'done') setBuildStage('verified');
-        else if (p.stage === 'failed') setBuildStage('failed');
-      };
+      const id = identifyBoard(device.vendorId, device.productId);
+      const protocol: UploadProtocol = device.bootsel
+        ? 'picoboot'
+        : id?.protocol ?? 'stk500v1';
 
       let result;
-      if (usePicoboot) {
-        result = await flashUf2(device.id, firmware!, true);
+      if (device.bootsel || protocol === 'picoboot') {
+        setBuildStage('uploading');
+        setUploadMsg('Flashing via PICOBOOT…');
+        result = await flashUf2(device.id, fw, true);
       } else {
+        setBuildStage('uploading');
+        setUploadMsg('Uploading via ' + protocol + '…');
         result = await upload(
           {
             device: { id: device.id, vendorId: device.vendorId, productId: device.productId },
-            protocol: boardId?.protocol ?? 'stk500v1',
-            firmware: firmware!,
-            filename: 'Sketch.ino',
+            protocol,
+            firmware: fw,
+            filename: sketchName.replace(/[^A-Za-z0-9_]/g, '_') + '.ino',
+            baudRate: 115200,
             verify: true,
           },
-          onProgress,
+          (p: UploadProgress) => {
+            setProgress(p.progress);
+            if (p.message) setUploadMsg(p.message);
+          },
         );
       }
 
       if (result.ok && result.verified) {
         setBuildStage('verified');
+        setUploadMsg('Upload verified successfully.');
         setProgress(1);
-        setProgressStage('done');
+      } else if (result.ok) {
+        setBuildStage('verified');
+        setUploadMsg('Upload completed. Verification not confirmed.');
+        setProgress(1);
       } else {
         setBuildStage('failed');
-        setError(result.message || 'Upload failed.');
+        setUploadMsg(result.message);
       }
     } catch (e) {
       setBuildStage('failed');
-      setError('Upload error: ' + (e as Error).message);
+      setUploadMsg((e as Error).message);
     } finally {
       setUploading(false);
     }
@@ -189,8 +200,8 @@ export default function EditorScreen() {
     if (diagnostics.length === 0) return;
     setAi('Thinking…');
     try {
-      const r = await api.ai.explainError({ diagnostics, code });
-      setAi((r as any).explanation);
+      const r = (await api.ai.explainError({ diagnostics, code })) as any;
+      setAi(r.explanation);
     } catch (e) {
       setAi('AI offline: ' + (e as Error).message);
     }
@@ -203,174 +214,133 @@ export default function EditorScreen() {
           <Text style={{ color: palette.textMuted, fontSize: 11 }}>Board</Text>
           <Row>
             <Text style={{ color: palette.text, fontWeight: '700' }}>{boardName}</Text>
-            <Text style={{ color: palette.accent, marginLeft: 6 }}>{boardOpen ? '▲' : '▼'}</Text>
+            <Text style={{ color: palette.accent, marginLeft: 4 }}>{boardOpen ? '\u25B2' : '\u25BC'}</Text>
           </Row>
         </Pressable>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button
-            label={compiling ? 'Compiling…' : 'Compile'}
-            onPress={doCompile}
-            disabled={compiling || uploading}
-            variant="primary"
-          />
-          <Button
-            label="Upload"
-            onPress={openDevicePicker}
-            disabled={compiling || uploading || !firmware}
-            variant="accent"
-          />
-        </View>
+        <Row>
+          <Button title="Verify" onPress={() => doCompile()} disabled={compiling || uploading} variant="ghost" />
+          <View style={{ width: 8 }} />
+          <Button title="Upload" onPress={startUpload} disabled={compiling || uploading} />
+        </Row>
       </View>
 
+      {!nativeUsb && (
+        <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
+          <Text style={{ color: palette.warning, fontSize: 12, fontWeight: '600' }}>
+            Expo Go detected — native USB unavailable. Build a dev/production APK for hardware access.
+          </Text>
+        </View>
+      )}
+
       {boardOpen && (
-        <View style={[styles.boardDropdown, { backgroundColor: palette.card, borderColor: palette.border }]}>
+        <View style={styles.boardList}>
           {BOARDS.map((b) => (
             <Pressable
               key={b.fqbn}
               onPress={() => { setFqbn(b.fqbn); setBoardOpen(false); }}
-              style={[styles.boardItem, b.fqbn === fqbn && { backgroundColor: palette.accent + '15' }]}
+              style={styles.boardItem}
             >
-              <Text style={{ color: palette.text, fontWeight: b.fqbn === fqbn ? '700' : '400' }}>
-                {b.name}
-              </Text>
+              <Text style={{ color: palette.text }}>{b.name}</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 11 }}>{b.fqbn}</Text>
             </Pressable>
           ))}
         </View>
       )}
 
-      {!nativeUsb && (
-        <View style={[styles.warning, { backgroundColor: '#fff3cd', borderColor: '#ffc107' }]}>
-          <Text style={{ color: '#856404', fontSize: 12, flex: 1 }}>
-            Native USB unavailable (Expo Go). Upload requires a DroidVibe dev/production build.
-          </Text>
-        </View>
-      )}
+      <View style={{ flex: 1, paddingHorizontal: 12 }}>
+        <CodeEditor value={code} onChange={setCode} diagnostics={diagnostics} />
+      </View>
 
-      <ScrollView
-        style={styles.editorScroll}
-        contentContainerStyle={{ paddingBottom: 200 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <CodeEditor value={code} onChange={setCode} />
+      <View style={[styles.bottomPanel, { backgroundColor: palette.bgElevated, borderColor: palette.surfaceBorder }]}>
+        <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+          <SectionTitle title="Output" subtitle={compiling ? 'Compiling…' : uploading ? 'Uploading…' : undefined} />
+          {(compiling || uploading) && <ActivityIndicator color={palette.accent} />}
+          {diagnostics.length > 0 && <Button title="Explain (AI)" onPress={doExplain} variant="ghost" />}
+        </Row>
 
-        {(buildStage !== 'idle' || compiling || uploading) && (
-          <View style={[styles.statusBar, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {compiling && <ActivityIndicator size="small" color={palette.accent} />}
-              <Text style={{ color: palette.text, fontWeight: '600' }}>
-                {STAGE_LABELS[buildStage] ?? buildStage}
-              </Text>
-              {progressStage && buildStage !== 'idle' && buildStage !== 'failed' && (
-                <Text style={{ color: palette.textMuted, fontSize: 12 }}>
-                  ({progressStage} {Math.round(progress * 100)}%)
-                </Text>
-              )}
-            </View>
-            {(uploading || (progress > 0 && progress < 1)) && (
-              <View style={[styles.progressTrack, { backgroundColor: palette.border }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { backgroundColor: palette.accent, width: `${Math.max(2, progress * 100)}%` },
-                  ]}
+        <BuildStageBar stage={buildStage} progress={progress} palette={palette} />
+
+        {uploadMsg && (
+          <Text style={{ color: palette.text, fontSize: 12, marginBottom: 4 }}>{uploadMsg}</Text>
+        )}
+        {error && <Text style={{ color: palette.danger, fontSize: 12, marginBottom: 4 }}>{error}</Text>}
+
+        <ScrollView style={{ maxHeight: 160 }}>
+          {diagnostics.map((d, i) => (
+            <Card key={i} style={{ marginBottom: 6, padding: 10 }}>
+              <Row>
+                <Badge
+                  label={d.severity}
+                  tone={d.severity === 'error' ? 'danger' : d.severity === 'warning' ? 'warn' : 'neutral'}
                 />
-              </View>
-            )}
-          </View>
-        )}
+                <Text style={{ color: palette.text, marginLeft: 8, fontSize: 13 }}>
+                  {d.file}:{d.line}:{d.column}
+                </Text>
+              </Row>
+              <Text style={{ color: palette.text, fontSize: 12, marginTop: 4 }}>{d.message}</Text>
+              {d.explanation ? (
+                <Text style={{ color: palette.accent, fontSize: 12, marginTop: 4 }}>{d.explanation}</Text>
+              ) : null}
+            </Card>
+          ))}
+          {ai && (
+            <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.accent }}>
+              <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI ASSISTANT</Text>
+              <Text style={{ color: palette.text, fontSize: 13, marginTop: 4 }}>{ai}</Text>
+            </Card>
+          )}
+          {diagnostics.length === 0 && !compiling && !ai && !uploadMsg && (
+            <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+              No diagnostics. Tap Verify to compile, Upload to flash firmware.
+            </Text>
+          )}
+        </ScrollView>
+      </View>
 
-        {error && (
-          <Card style={{ marginTop: 8, borderColor: '#dc3545' }}>
-            <Text style={{ color: '#dc3545', fontSize: 13 }}>{error}</Text>
-          </Card>
-        )}
-
-        {diagnostics.length > 0 && (
-          <View style={{ marginTop: 8, gap: 4 }}>
-            <SectionTitle>Diagnostics ({diagnostics.length})</SectionTitle>
-            {diagnostics.map((d, i) => (
-              <Card key={i} style={{ padding: 8 }}>
-                <Row>
-                  <Badge
-                    label={d.severity.toUpperCase()}
-                    color={d.severity === 'error' ? '#dc3545' : d.severity === 'warning' ? '#ffc107' : palette.accent}
-                  />
-                  <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-                    {d.file}:{d.line}:{d.column}
-                  </Text>
-                </Row>
-                <Text style={{ color: palette.text, fontSize: 13, marginTop: 4 }}>{d.message}</Text>
-                {d.explanation && (
-                  <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2, fontStyle: 'italic' }}>
-                    {d.explanation}
-                  </Text>
-                )}
-              </Card>
-            ))}
-            <Button label="Explain with AI" onPress={doExplain} variant="ghost" />
-          </View>
-        )}
-
-        {ai && (
-          <Card style={{ marginTop: 8 }}>
-            <SectionTitle>AI Assistant</SectionTitle>
-            <Text style={{ color: palette.text, fontSize: 13 }}>{ai}</Text>
-          </Card>
-        )}
-      </ScrollView>
-
-      <Modal visible={devicePickerOpen} animationType="slide" transparent={true} onRequestClose={() => setDevicePickerOpen(false)}>
+      {/* Device picker modal */}
+      <Modal visible={showDevicePicker} animationType="slide" transparent onRequestClose={() => setShowDevicePicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: palette.bg }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
-              <Text style={{ color: palette.text, fontWeight: '700', fontSize: 16 }}>Select USB Device</Text>
-              <Pressable onPress={() => setDevicePickerOpen(false)}>
-                <Text style={{ color: palette.accent, fontSize: 16 }}>Cancel</Text>
-              </Pressable>
-            </View>
-
-            {devices.length === 0 ? (
-              <View style={{ padding: 24, alignItems: 'center' }}>
-                <Text style={{ color: palette.textMuted, textAlign: 'center' }}>
-                  No USB devices detected. Connect an Arduino and tap to retry.
-                </Text>
-                <Button
-                  label="Refresh"
-                  onPress={async () => setDevices(await listDevices())}
-                  variant="primary"
-                />
-              </View>
-            ) : (
-              <FlatList
-                data={devices}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => {
-                  const boardId = identifyBoard(item.vendorId, item.productId);
-                  return (
-                    <Pressable
-                      onPress={() => selectDevice(item)}
-                      style={[styles.deviceItem, { borderBottomColor: palette.border }]}
-                    >
+          <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
+            <Row style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Select device</Text>
+              <Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
+            </Row>
+            <FlatList
+              data={devices}
+              keyExtractor={(d) => d.id}
+              renderItem={({ item }) => {
+                const id = identifyBoard(item.vendorId, item.productId);
+                return (
+                  <Pressable
+                    onPress={() => doUploadToDevice(item)}
+                    style={[styles.deviceItem, { borderColor: palette.surfaceBorder }]}
+                  >
+                    <Row style={{ justifyContent: 'space-between' }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: palette.text, fontWeight: '600' }}>
-                          {item.productName ?? boardId?.name ?? 'Unknown Device'}
+                        <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
+                          {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
-                        <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-                          {item.manufacturer ?? 'Unknown'} · VID:{item.vendorId} PID:{item.productId}
-                          {item.bootsel ? ' · BOOTSEL' : ''}
+                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
+                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
                         </Text>
-                        {boardId && (
-                          <Text style={{ color: palette.accent, fontSize: 11 }}>
-                            {boardId.fqbn} · {boardId.protocol}
-                          </Text>
-                        )}
                       </View>
-                      <Text style={{ color: palette.accent, fontSize: 20 }}>›</Text>
-                    </Pressable>
-                  );
-                }}
-              />
-            )}
+                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
+                    </Row>
+                    {id && (
+                      <Row style={{ marginTop: 6 }}>
+                        <Badge label={id.protocol} tone="accent" />
+                        <Text style={{ color: palette.textMuted, fontSize: 11, marginLeft: 8 }}>{id.fqbn}</Text>
+                      </Row>
+                    )}
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <Text style={{ color: palette.textMuted, textAlign: 'center', padding: 20 }}>
+                  No devices found. Connect a board and tap Rescan on the Devices tab.
+                </Text>
+              }
+            />
           </View>
         </View>
       </Modal>
@@ -378,72 +348,54 @@ export default function EditorScreen() {
   );
 }
 
+function BuildStageBar({ stage, progress, palette }: { stage: string; progress: number; palette: any }) {
+  const stages = ['idle', 'compiling', 'connecting', 'uploading', 'verified'];
+  const colors: Record<string, string> = {
+    idle: palette.textMuted,
+    compiling: palette.accent,
+    connecting: palette.accent,
+    uploading: palette.accent,
+    verified: palette.success,
+    failed: palette.danger,
+  };
+  const failed = stage === 'failed';
+  const activeIdx = stages.indexOf(stage);
+
+  return (
+    <View style={{ marginBottom: 8 }}>
+      <Row>
+        {stages.map((s, i) => {
+          const reached = !failed && activeIdx >= i;
+          const active = !failed && activeIdx === i;
+          const color = failed ? palette.danger : reached ? colors[stage] : palette.surfaceBorder;
+          return (
+            <View key={s} style={{ flex: 1, marginHorizontal: 2 }}>
+              <View style={{ height: 4, borderRadius: 2, backgroundColor: color }} />
+              <Text style={{ color: active ? colors[stage] : palette.textMuted, fontSize: 9, marginTop: 2, textAlign: 'center' }}>
+                {s}
+              </Text>
+            </View>
+          );
+        })}
+      </Row>
+      {(stage === 'uploading' || stage === 'connecting') && progress > 0 && (
+        <View style={{ height: 3, borderRadius: 1.5, backgroundColor: palette.surfaceBorder, marginTop: 6, overflow: 'hidden' }}>
+          <View style={{ height: '100%', width: `${Math.round(progress * 100)}%`, backgroundColor: palette.accent }} />
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8 },
+  banner: { marginHorizontal: 12, marginBottom: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
   boardPicker: { paddingVertical: 4 },
-  boardDropdown: {
-    marginHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  boardItem: { paddingVertical: 10, paddingHorizontal: 14 },
-  warning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 12,
-    marginTop: 4,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  editorScroll: { flex: 1, paddingHorizontal: 0 },
-  statusBar: {
-    marginHorizontal: 12,
-    marginTop: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    marginTop: 8,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '60%',
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  deviceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
-  },
+  boardList: { paddingHorizontal: 12, paddingBottom: 8 },
+  boardItem: { paddingVertical: 8, borderBottomWidth: 0.5, borderColor: 'rgba(150,150,150,0.2)' },
+  bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 16 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, padding: 20, maxHeight: '70%' },
+  deviceItem: { padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
 });

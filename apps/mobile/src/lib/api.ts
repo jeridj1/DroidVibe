@@ -20,6 +20,7 @@ async function rpc<T>(path: string, input: unknown): Promise<T> {
     if (!json.ok) throw new Error(json.error ?? 'RPC error');
     return json.data as T;
   } catch (e) {
+    // Offline mode: rethrow so callers can show a clear offline state.
     throw new Error('Backend unreachable: ' + (e as Error).message);
   }
 }
