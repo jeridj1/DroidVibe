@@ -21,7 +21,10 @@ export type ProcedureDef<I extends AnyInputSchema, O> = {
 };
 
 export type AnyProcedure = ProcedureDef<AnyInputSchema, unknown>;
-export type RouterShape = Record<string, AnyProcedure>;
+
+/** Router nodes can be individual procedures or nested sub-routers. */
+export type RouterNode = AnyProcedure | { [key: string]: RouterNode };
+export type RouterShape = Record<string, RouterNode>;
 
 /** Build a procedure. ``procedure(schema, handler)``. */
 export function procedure<I extends AnyInputSchema, O>(

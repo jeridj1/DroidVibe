@@ -31,6 +31,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Typecheck + Lint (capture)
         run: |
+          set +e
           pnpm typecheck > typecheck.log 2>&1; tc=$?
           pnpm lint > lint.log 2>&1; lc=$?
           {
@@ -71,6 +72,7 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - name: Build web (capture)
         run: |
+          set +e
           pnpm --filter @droidvibe/web build > build.log 2>&1; b=$?
           { echo '## Web build (exit '${b}')'; echo '```'; cat build.log; echo '```'; } > combined.log
           [ "${b}" -eq 0 ]
@@ -106,6 +108,7 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - name: Tests (capture)
         run: |
+          set +e
           pnpm test > test.log 2>&1; t=$?
           { echo '## Tests (exit '${t}')'; echo '```'; cat test.log; echo '```'; } > combined.log
           [ "${t}" -eq 0 ]
@@ -137,6 +140,7 @@ jobs:
       - name: Expo prebuild (Android, capture)
         working-directory: apps/mobile
         run: |
+          set +e
           pnpm exec expo prebuild --platform android --no-install --clean > prebuild.log 2>&1; p=$?
           { echo '## Expo prebuild (exit '${p}')'; echo '```'; cat prebuild.log; echo '```'; } > combined.log
           [ "${p}" -eq 0 ]

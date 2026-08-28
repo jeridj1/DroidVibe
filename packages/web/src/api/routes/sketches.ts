@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { procedure } from '../rpc.js';
-import { db, schema } from '@droidvibe/db';
+import { schema } from '@droidvibe/db';
+import { db } from '../context.js';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
