@@ -23,10 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-        continue-on-error: true
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
 
@@ -43,8 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @droidvibe/web build
       - uses: actions/upload-artifact@v4
         with:
@@ -64,8 +60,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
 
   mobile-prebuild:
@@ -81,8 +76,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean

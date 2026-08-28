@@ -1,11 +1,13 @@
 /**
  * Typed RPC client for the DroidVibe backend. Calls POST /rpc/<ns>/<proc> with
- * a JSON body. Falls back to an offline/mock response when the backend is
- * unreachable so the UI remains explorable.
+ * a JSON body. Falls back to a clear offline error when the backend is
+ * unreachable so the UI can show an explicit offline state (never fake success).
  */
-import { API_BASE_URL } from '@env';
+import Constants from 'expo-constants';
 
-const BASE = (API_BASE_URL as string) || 'http://localhost:3001';
+const BASE =
+  ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
+    'http://localhost:3001');
 
 async function rpc<T>(path: string, input: unknown): Promise<T> {
   try {
@@ -24,21 +26,31 @@ async function rpc<T>(path: string, input: unknown): Promise<T> {
 }
 
 export const api = {
-  compile: (input: { name: string; fqbn: string; files: Array<{ path: string; content: string }> }) =>
-    rpc<{ ok: boolean; diagnostics: any[]; firmwarePath?: string; durationMs: number; stdout: string }>('compile', input),
-  diagnostics: { explain: (input: any) => rpc('diagnostics/explain', input) },
+  compile: (input: {
+    name: string;
+    fqbn: string;
+    files: Array<{ path: string; content: string }>;
+  }) =>
+    rpc<{
+      ok: boolean;
+      diagnostics: unknown[];
+      firmwarePath?: string;
+      durationMs: number;
+      stdout: string;
+    }>('compile', input),
+  diagnostics: { explain: (input: unknown) => rpc('diagnostics/explain', input) },
   boards: { list: (input: { query?: string }) => rpc('boards/list', input) },
   libraries: { list: (input: { query?: string }) => rpc('libraries/list', input) },
   sketches: {
     list: () => rpc('sketches/list', {}),
     get: (id: string) => rpc('sketches/get', { id }),
-    create: (input: any) => rpc('sketches/create', input),
-    save: (input: any) => rpc('sketches/save', input),
+    create: (input: unknown) => rpc('sketches/create', input),
+    save: (input: unknown) => rpc('sketches/save', input),
   },
   ai: {
-    explainError: (input: any) => rpc('ai/explainError', input),
+    explainError: (input: unknown) => rpc('ai/explainError', input),
     generate: (input: { prompt: string; boardFqbn?: string }) => rpc('ai/generate', input),
-    fix: (input: any) => rpc('ai/fix', input),
+    fix: (input: unknown) => rpc('ai/fix', input),
   },
   examples: {
     list: () => rpc('examples/list', {}),
