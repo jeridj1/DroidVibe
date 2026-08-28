@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { procedure } from '../rpc.js';
+import { procedure } from '../../rpc.js';
 import { spawn } from 'node:child_process';
 import { env } from '../../env.js';
 

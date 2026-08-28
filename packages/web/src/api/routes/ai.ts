@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { procedure } from '../rpc.js';
+import { procedure } from '../../rpc.js';
 import { env } from '../../env.js';
 
 const ExplainErrorInput = z.object({
@@ -64,7 +64,8 @@ async function chat(system: string, user: string): Promise<string> {
       temperature: 0.2,
     }),
   });
-  if (!res.ok) return '[error] AI request failed: ' + res.status;
+  if (!res.ok) return '[error] AI request failed: ' + res.sta
+tus;
   const data = (await res.json()) as { choices: Array<{ message: { content: string } }> };
   return data.choices?.[0]?.message?.content ?? '';
 }

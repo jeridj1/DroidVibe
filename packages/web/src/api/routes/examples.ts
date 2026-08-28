@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { procedure } from '../rpc.js';
+import { procedure } from '../../rpc.js';
 
 export interface Example {
   id: string;
@@ -66,7 +66,8 @@ export const EXAMPLES: Example[] = [
         language: 'ino',
         content: '// AnalogRead — streams A0 for the serial plotter.\n' +
           'void setup() { Serial.begin(9600); }\n\n' +
-          'void loop() { Serial.println(analogRead(A0)); delay(20); }\n',
+          'void loop() { Serial.println(analogRead(A0)); delay(20);
+ }\n',
       },
     ],
   },

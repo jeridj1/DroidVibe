@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { procedure } from '../rpc.js';
+import { procedure } from '../../rpc.js';
 import { prepareSketchJob, compileSketch, cleanupJob } from '../../arduino/cli.js';
 import { parseArduinoCliJson, explainDiagnostics } from '@droidvibe/shared';
 import { env } from '../../env.js';

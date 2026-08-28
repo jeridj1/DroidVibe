@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { procedure } from '../rpc.js';
+import { procedure } from '../../rpc.js';
 import { explainDiagnostics } from '@droidvibe/shared';
 import type { Diagnostic } from '@droidvibe/shared';
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { procedure } from '../rpc.js';
+import { procedure } from '../../rpc.js';
 import { schema } from '@droidvibe/db';
 import { db } from '../context.js';
 import { eq } from 'drizzle-orm';
@@ -57,7 +57,8 @@ export const save = procedure(SaveInput, async ({ input }) => {
     // upsert by sketchId + path (simple model: delete + insert)
     const existing = await db
       .select()
-      .from(schema.sketchFiles)
+      .
+from(schema.sketchFiles)
       .where(eq(schema.sketchFiles.sketchId, input.id));
     const found = existing.find((e) => e.path === f.path);
     if (found) {
