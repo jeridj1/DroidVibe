@@ -35,7 +35,7 @@ export function CodeEditor({ value, onChange, diagnostics = [] }: Props) {
               <Text style={[styles.gutterText, { color: errorLines.has(i + 1) ? palette.danger : palette.textMuted }]}>
                 {String(i + 1).padStart(3, ' ')}
               </Text>
-              {errorLines.has(i + 1) && <Text style={{ color: palette.danger, fontSize: 9 }}>{'●'}</Text>}
+              {errorLines.has(i + 1) && <Text style={{ color: palette.danger, fontSize: 9 }}>{'\u25CF'}</Text>}
             </View>
           ))}
         </View>
@@ -57,9 +57,10 @@ export function CodeEditor({ value, onChange, diagnostics = [] }: Props) {
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
+            cursorColor={palette.accent}
             style={[
               styles.input,
-              { color: 'transparent', caretColor: palette.accent },
+              { color: 'transparent' },
             ]}
             placeholderTextColor={palette.textMuted}
           />

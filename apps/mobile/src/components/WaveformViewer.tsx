@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Palette } from '@/src/theme/colors';
 
@@ -70,13 +70,13 @@ export function WaveformViewer({ mode, palette }: Props) {
       <View style={{ height: 2, backgroundColor: palette.typeColor, opacity: 0.5, marginBottom: 4, marginLeft: `${cursorB}%` }} />
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: palette.monoText, fontSize: 10 }}>Δt = {delta} samples</Text>
-        <Text style={{ color: palette.monoText, fontSize: 10 }}>f ≈ {freq} Hz</Text>
+        <Text style={{ color: palette.monoText, fontSize: 10 }}>\u0394t = {delta} samples</Text>
+        <Text style={{ color: palette.monoText, fontSize: 10 }}>f \u2248 {freq} Hz</Text>
       </View>
 
       <View style={{ marginTop: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => setCursorA((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>◀ A ▶</Text></Pressable>
-        <Pressable onPress={() => setCursorB((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>◀ B ▶</Text></Pressable>
+        <Pressable onPress={() => setCursorA((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>\u25C0 A \u25B6</Text></Pressable>
+        <Pressable onPress={() => setCursorB((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>\u25C0 B \u25B6</Text></Pressable>
       </View>
 
       <View style={{ marginTop: 6 }}>
@@ -93,11 +93,11 @@ export function WaveformViewer({ mode, palette }: Props) {
 function ZoomBar({ zoom, setZoom, palette }: { zoom: number; setZoom: (n: number) => void; palette: Palette }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
-      <Pressable onPress={() => setZoom((z) => Math.max(0.4, z - 0.2))} style={styles.zb}>
-        <Text style={{ color: palette.accent, fontWeight: '800' }}>−</Text>
+      <Pressable onPress={() => setZoom(Math.max(0.4, zoom - 0.2))} style={styles.zb}>
+        <Text style={{ color: palette.accent, fontWeight: '800' }}>\u2212</Text>
       </Pressable>
-      <Text style={{ color: palette.monoText, fontSize: 10, marginHorizontal: 6, alignSelf: 'center' }}>{zoom.toFixed(1)}×</Text>
-      <Pressable onPress={() => setZoom((z) => Math.min(4, z + 0.2))} style={styles.zb}>
+      <Text style={{ color: palette.monoText, fontSize: 10, marginHorizontal: 6, alignSelf: 'center' }}>{zoom.toFixed(1)}\u00D7</Text>
+      <Pressable onPress={() => setZoom(Math.min(4, zoom + 0.2))} style={styles.zb}>
         <Text style={{ color: palette.accent, fontWeight: '800' }}>+</Text>
       </Pressable>
     </View>
