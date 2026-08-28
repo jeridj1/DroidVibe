@@ -15,6 +15,9 @@ permissions:
   contents: read
   issues: write
 
+env:
+  EXPO_NO_TELEMETRY: '1'
+
 jobs:
   quality:
     name: Typecheck & Lint
@@ -64,8 +67,8 @@ jobs:
       - run: pnpm --filter @droidvibe/web build 2>&1 | tee web-build.log
       - uses: actions/upload-artifact@v4
         with:
-          name: web-dist
-          path: packages/web/dist
+           name: web-dist
+            path: packages/web/dist
       - name: Report failure as issue
         if: failure()
         env:
@@ -86,7 +89,7 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+           node-version: 20
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test 2>&1 | tee test.log
       - name: Report failure as issue
@@ -109,7 +112,7 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+           node-version: 20
       - run: pnpm install --no-frozen-lockfile
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
@@ -126,7 +129,7 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [quality, mobile-prebuild]
+    neeeds: [quality, mobile-prebuild]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -150,63 +153,105 @@ jobs:
             'platform-tools' \
             'ndk;27.0.12077973' \
             'cmake;3.22.1' 2>/dev/null || true
+      - name: Print environment info
+        run: |
+          echo "=== Node ==="
+          node --version
+          echo "=== pnpm ==="
+          pnpm --version
+          echo "=== Java ==="
+          java --version 2>&1
+          echo "=== ANDROID_HOME ==="
+          echo "$ANDROID_HOME"
+          echo "=== NDK ==="
+          ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null || echo "(no NDK installed)"
+          echo "=== CMake ==="
+          ls -d "$ANDROID_HOME"/cmake/* 2>/dev/null || echo "(no CMake installed)"
+          echo "=== Expo version ==="
+          cd apps/mobile && pnpm exec expo --version
+
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean
-      - name: Patch Kotlin version for Compose Compiler compatibility
+        run: pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
+
+      - name: Diagnose build state
+        working-directory: apps/mobile
+        if: always()
+        run: |
+          echo "=== android/ directory ==="
+          ls -la android/ 2>&1 || echo "android/ directory NOT FOUND (prebuild likely failed)"
+          echo ""
+          echo "=== gradlew check ==="
+          ls -la android/gradlew 2>&1 || echo "gradlew NOT FOUND"
+          file android/gradlew 2>&1 || true
+          echo ""
+          echo "=== gradle.properties (before patch) ==="
+          cat android/gradle.properties 2>/dev/null || echo "(gradle.properties not found)"
+          echo ""
+          echo "=== settings.gradle (first 30 lines) ==="
+          head -30 android/settings.gradle 2>/dev/null || echo "(settings.gradle not found)"
+
+      - name: Patch Kotlin version + JVM args
         working-directory: apps/mobile/android
         run: |
           if [ -f gradle.properties ]; then
             sed -i 's/kotlinVersion=.*/kotlinVersion=1.9.25/' gradle.properties
-            echo "Patched Kotlin version to 1.9.25"
+            if ! grep -q "org.gradle.jvmargs" gradle.properties; then
+              echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
+            fi
+            echo "Patched Kotlin version to 1.9.25 + JVM args"
             grep -i kotlin gradle.properties || true
+            grep -i jvmargs gradle.properties || true
           else
             echo "kotlinVersion=1.9.25" >> gradle.properties
-            echo "Added Kotlin version 1.9.25"
+            echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
+            echo "Created gradle.properties with Kotlin 1.9.25 + JVM args"
           fi
+
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
-      - name: Show Kotlin compiler errors
-        working-directory: apps/mobile/android
-        if: always()
-        run: |
-          grep -E "^e: |error:|Unresolved reference" gradle-build.log | head -50 || echo "No Kotlin error lines found"
-      - name: Show Gradle build log (last 100 lines)
-        working-directory: apps/mobile/android
-        if: always()
-        run: tail -100 gradle-build.log || true
+          ./gradlew assembleDebug --no-daemon --stacktrace --max-workers=2 2>&1 | tee gradle-build.log
+
       - uses: actions/upload-artifact@v4
         with:
           name: droidvibe-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
         if: always()
+
       - uses: actions/upload-artifact@v4
         with:
-          name: gradle-build-log
-          path: apps/mobile/android/gradle-build.log
+          name: build-logs
+          path: |
+            apps/mobile/prebuild.log
+            apps/mobile/android/gradle-build.log
           retention-days: 14
         if: always()
+
       - name: Report failure as issue
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo '## Gradle Build Log (Kotlin errors)'
+            echo '## Prebuild Log (last 100 lines)'
             echo '```'
-            grep -E "^e: |error:|Unresolved reference" apps/mobile/android/gradle-build.log 2>/dev/null | head -50 || echo "No Kotlin error lines found"
+            tail -100 apps/mobile/prebuild.log 2>/dev/null || echo "(prebuild.log not found â prebuild step likely failed)"
             echo '```'
             echo ""
-            echo '## Last 100 lines'
+            echo '## Gradle Build Log (Kotlin/compiler errors)'
             echo '```'
-            tail -100 apps/mobile/android/gradle-build.log 2>/dev/null || true
+            grep -E "^e: |error:|Unresolved reference" apps/mobile/android/gradle-build.log 2>/dev/null | head -80 || echo "No error lines found in gradle-build.log"
+            echo '```'
+            echo ""
+            echo '## Gradle Build Log (last 200 lines)'
+            echo '```'
+            tail -200 apps/mobile/android/gradle-build.log 2>/dev/null || echo "(gradle-build.log not found â build step failed before gradle ran)"
             echo '```'
             echo ""
             echo "Commit: ${{ github.sha }}"
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } > /tmp/issue-body.md
-          gh issue create --title "CI: APK build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
+          gh issue create --title "CI: APK build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || trueÿ
