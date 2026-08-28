@@ -18,7 +18,6 @@ const native: DroidVibeUsbModuleType | null = getNativeUsbModule();
 
 export const isNativeUsbAvailable = (): boolean => native !== null;
 
-/** List USB devices; empty in mock mode. */
 export async function listDevices(): Promise<UsbDevice[]> {
   if (native) return native.listDevices();
   return [];
@@ -59,7 +58,16 @@ export async function upload(
   onProgress?: (p: UploadProgress) => void,
 ): Promise<UploadResult> {
   if (native) return native.upload(request, onProgress);
-  // Mock mode never fakes success.
+  return { ok: false, stage: 'failed', verified: false, message: 'Native USB unavailable (Expo Go).' };
+}
+
+/** Flash an RP2040 in BOOTSEL mode via PICOBOOT. */
+export async function flashUf2(
+  deviceId: string,
+  uf2Base64: string,
+  verify: boolean,
+): Promise<UploadResult> {
+  if (native) return native.flashUf2(deviceId, uf2Base64, verify);
   return { ok: false, stage: 'failed', verified: false, message: 'Native USB unavailable (Expo Go).' };
 }
 
