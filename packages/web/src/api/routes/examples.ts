@@ -13,13 +13,14 @@ export const EXAMPLES: Example[] = [
   {
     id: 'blink',
     name: 'Blink',
-    description: 'The classic Arduino Blink sketch — toggles the onboard LED.',
+    description: 'The classic Arduino Blink sketch \u2014 toggles the onboard LED.',
     board: 'arduino:avr:uno',
     files: [
       {
         path: 'Blink.ino',
         language: 'ino',
-        content: '// Blink — turns the onboard LED on for 1s, off for 1s, forever.\n' +
+        content:
+          '// Blink \u2014 turns the onboard LED on for 1s, off for 1s, forever.\n' +
           'void setup() {\n' +
           '  pinMode(LED_BUILTIN, OUTPUT);\n' +
           '}\n\n' +
@@ -41,7 +42,8 @@ export const EXAMPLES: Example[] = [
       {
         path: 'SerialTest.ino',
         language: 'ino',
-        content: '// SerialTest — prints a counter every second.\n' +
+        content:
+          '// SerialTest \u2014 prints a counter every second.\n' +
           'long counter = 0;\n\n' +
           'void setup() {\n' +
           '  Serial.begin(9600);\n' +
@@ -64,10 +66,10 @@ export const EXAMPLES: Example[] = [
       {
         path: 'AnalogRead.ino',
         language: 'ino',
-        content: '// AnalogRead — streams A0 for the serial plotter.\n' +
+        content:
+          '// AnalogRead \u2014 streams A0 for the serial plotter.\n' +
           'void setup() { Serial.begin(9600); }\n\n' +
-          'void loop() { Serial.println(analogRead(A0)); delay(20);
- }\n',
+          'void loop() { Serial.println(analogRead(A0)); delay(20); }\n',
       },
     ],
   },
@@ -80,7 +82,8 @@ export const EXAMPLES: Example[] = [
       {
         path: 'PicoBlink.ino',
         language: 'ino',
-        content: '// PicoBlink — onboard LED blink for Raspberry Pi Pico.\n' +
+        content:
+          '// PicoBlink \u2014 onboard LED blink for Raspberry Pi Pico.\n' +
           '#define LED_PIN LED_BUILTIN\n\n' +
           'void setup() { pinMode(LED_PIN, OUTPUT); }\n\n' +
           'void loop() { digitalWrite(LED_PIN, HIGH); delay(500); digitalWrite(LED_PIN, LOW); delay(500); }\n',
