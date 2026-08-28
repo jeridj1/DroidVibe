@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
@@ -59,6 +60,10 @@ export default function EditorScreen() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [sketchName, setSketchName] = useState('Sketch');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiGen, setShowAiGen] = useState(false);
   const nativeUsb = isNativeUsbAvailable();
 
   // Load pending sketch from sketchBridge on mount
@@ -207,6 +212,37 @@ export default function EditorScreen() {
     }
   }
 
+  async function doGenerate() {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
+    setAiResult(null);
+    setAi(null);
+    try {
+      const r = (await api.ai.generate({ prompt: aiPrompt, boardFqbn: fqbn })) as any;
+      setAiResult(r.code ?? r.sketch ?? r.output ?? null);
+    } catch (e) {
+      setAiResult(null);
+      setAi('AI offline: ' + (e as Error).message);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  async function doFix() {
+    setAiLoading(true);
+    setAiResult(null);
+    setAi(null);
+    try {
+      const r = (await api.ai.fix({ code, diagnostics })) as any;
+      setAiResult(r.code ?? r.fixedCode ?? null);
+    } catch (e) {
+      setAiResult(null);
+      setAi('AI offline: ' + (e as Error).message);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
@@ -256,6 +292,8 @@ export default function EditorScreen() {
           <SectionTitle title="Output" subtitle={compiling ? 'Compiling…' : uploading ? 'Uploading…' : undefined} />
           {(compiling || uploading) && <ActivityIndicator color={palette.accent} />}
           {diagnostics.length > 0 && <Button title="Explain (AI)" onPress={doExplain} variant="ghost" />}
+          {diagnostics.length > 0 && <Button title="Fix (AI)" onPress={doFix} disabled={aiLoading} variant="ghost" />}
+          <Button title="Generate" onPress={() => setShowAiGen((v) => !v)} variant="ghost" />
         </Row>
 
         <BuildStageBar stage={buildStage} progress={progress} palette={palette} />
@@ -287,6 +325,48 @@ export default function EditorScreen() {
             <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.accent }}>
               <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI ASSISTANT</Text>
               <Text style={{ color: palette.text, fontSize: 13, marginTop: 4 }}>{ai}</Text>
+            </Card>
+          )}
+          {showAiGen && (
+            <Card style={{ marginBottom: 6, padding: 10 }}>
+              <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI CODE GENERATOR</Text>
+              <TextInput
+                value={aiPrompt}
+                onChangeText={setAiPrompt}
+                placeholder="Describe what you want to build… (e.g. 'blink LED with button')"
+                placeholderTextColor={palette.textMuted}
+                multiline
+                style={{
+                  color: palette.text,
+                  borderWidth: 1,
+                  borderColor: palette.surfaceBorder,
+                  borderRadius: 8,
+                  padding: 8,
+                  marginTop: 6,
+                  fontSize: 13,
+                  minHeight: 60,
+                }}
+              />
+              <Row style={{ marginTop: 6 }}>
+                <Button title={aiLoading ? 'Generating…' : 'Generate'} onPress={doGenerate} disabled={aiLoading} />
+                {aiLoading && <ActivityIndicator color={palette.accent} style={{ marginLeft: 8 }} />}
+              </Row>
+            </Card>
+          )}
+          {aiResult !== null && (
+            <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.success }}>
+              <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI GENERATED CODE</Text>
+                <Button
+                  title="Insert into editor"
+                  onPress={() => { setCode(aiResult); setAiResult(null); setShowAiGen(false); setDiagnostics([]); }}
+                  variant="ghost"
+                />
+              </Row>
+              <Text style={{ color: palette.monoText, fontFamily: 'monospace', fontSize: 11, lineHeight: 16 }}>
+                {aiResult.split('\n').slice(0, 20).join('\n')}
+                {aiResult.split('\n').length > 20 ? '\n…' : ''}
+              </Text>
             </Card>
           )}
           {diagnostics.length === 0 && !compiling && !ai && !uploadMsg && (
