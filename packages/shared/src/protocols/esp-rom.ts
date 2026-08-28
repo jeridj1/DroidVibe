@@ -113,14 +113,18 @@ export function cmdFlashBegin(totalSize: number, offset: number, numPackets: num
   return frameCommand(ESP_ROM.CMD_FLASH_BEGIN, 0, 16, data);
 }
 
-/** Build a FLASH_DATA command for one data block. */
+/**
+ * Build a FLASH_DATA command for one data block.
+ * Data layout per esptool: [size(4) | seq(4) | data(N) | padding].
+ */
 export function cmdFlashData(block: Uint8Array, seq: number, padTo = 0): Uint8Array {
   const pad = padTo > block.length ? padTo - block.length : 0;
-  const data = new Uint8Array(4 + block.length + pad);
+  const data = new Uint8Array(8 + block.length + pad);
   data.set(le32(block.length), 0);
-  data.set(block, 4);
+  data.set(le32(seq), 4);
+  data.set(block, 8);
   // pad with 0xff
-  for (let i = 0; i < pad; i++) data[4 + block.length + i] = 0xff;
+  for (let i = 0; i < pad; i++) data[8 + block.length + i] = 0xff;
   return frameCommand(ESP_ROM.CMD_FLASH_DATA, espChecksum(block), data.length, data);
 }
 
