@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-main
   cancel-in-progress: true
 
 permissions:
@@ -29,21 +29,8 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm typecheck 2>&1 | tee typecheck.log
-      - run: pnpm lint 2>&1 | tee lint.log
-      - name: Report failure as issue
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo '## Typecheck / Lint output' > /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          cat typecheck.log lint.log 2>/dev/null | tail -150 >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          echo '' >> /tmp/issue-body.md
-          echo "Commit: ${{ github.sha }}" >> /tmp/issue-body.md
-          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
-          gh issue create --title "CI: Typecheck/Lint failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
+      - run: pnpm typecheck
+      - run: pnpm lint
 
   web-build:
     name: Build Web Backend
@@ -59,21 +46,11 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm --filter @droidvibe/web build 2>&1 | tee web-build.log
+      - run: pnpm --filter @droidvibe/web build
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: packages/web/dist
-      - name: Report failure as issue
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo '```' > /tmp/issue-body.md
-          tail -80 web-build.log 2>/dev/null >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
-          gh issue create --title "CI: Web build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   test:
     name: Unit Tests
@@ -89,17 +66,7 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm test 2>&1 | tee test.log
-      - name: Report failure as issue
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo '```' > /tmp/issue-body.md
-          tail -150 test.log 2>/dev/null >> /tmp/issue-body.md
-          echo '```'>> /tmp/issue-body.md
-          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
-          gh issue create --title "CI: Test failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
+      - run: pnpm test
 
   mobile-prebuild:
     name: Expo Prebuild Validation
@@ -119,23 +86,10 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
-      - name: Report failure as issue
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo '## Prebuild log (last 80 lines)' > /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          tail -80 apps/mobile/prebuild.log 2>/dev/null >> /tmp/issue-body.md || echo "no prebuild.log" >> /tmp/issue-body.md
-          echo '```'>> /tmp/issue-body.md
-          echo '' >> /tmp/issue-body.md
-          echo "Commit: ${{ github.sha }}" >> /tmp/issue-body.md
-          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
-          gh issue create --title "CI: Prebuild failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
+        run: pnpm exec expo prebuild --platform android --no-install --clean
 
   apk-build:
-    name: Build Android AP
+    name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [quality, mobile-prebuild]
@@ -166,79 +120,34 @@ jobs:
             'cmake;3.22.1' 2>/dev/null || true
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
-      - name: Patch Kotlin version for Compose Compiler compatibility
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+      - name: Patch Kotlin version
         working-directory: apps/mobile/android
         run: |
           if [ -f gradle.properties ]; then
             sed -i 's/kotlinVersion=.*/kotlinVersion=1.9.25/' gradle.properties
             echo "Patched Kotlin version to 1.9.25"
-            grep -i kotlin gradle.properties || true
           else
             echo "kotlinVersion=1.9.25" >> gradle.properties
-            echo "Added Kotlin version 1.9.25"
           fi
-      - name: Diagnose build state
-        working-directory: apps/mobile/android
-        run: |
-          echo "=== gradle.properties ==="
-          cat gradle.properties 2>/dev/null || echo "no gradle.properties"
-          echo "=== settings.gradle ==="
-          cat settings.gradle 2>/dev/null || echo "no settings.gradle"
-          echo "=== app/build.gradle exists ==="
-          ls -la app/build.gradle 2>/dev/null || echo "no app/build.gradle"
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g" 2>&1 | tee gradle-build.log
-      - name: Show Kotlin compiler errors
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+      - name: Show errors
         working-directory: apps/mobile/android
         if: always()
-        run: grep -E "^e: |error:|Unresolved reference" gradle-build.log | head -50 || echo "No Kotlin error lines found"
-      - name: Show Gradle build log (last 100 lines)
-        working-directory: apps/mobile/android
-        if: always()
-        run: tail -100 gradle-build.log || true
+        run: grep -E "^e: |error:|Unresolved reference" gradle-build.log | head -50 || true
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: droidvibe-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
-        if: always()
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: gradle-build-log
           path: apps/mobile/android/gradle-build.log
           retention-days: 14
-        if: always()
-      - uses: actions/upload-artifact@v4
-        with:
-          name: prebuild-log
-          path: apps/mobile/prebuild.log
-          retention-days: 14
-        if: always()
-      - name: Report failure as issue
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo '## Prebuild log (last 40 lines)' > /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          tail -40 apps/mobile/prebuild.log 2>/dev/null >> /tmp/issue-body.md || echo "no prebuild.log" >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          echo '' >> /tmp/issue-body.md
-          echo '## Gradle Build Log (Kotlin errors)' >> /tmp/issue-body.md
-          echo '```'>> /tmp/issue-body.md
-          grep -E "^e: |error:|Unresolved reference" apps/mobile/android/gradle-build.log 2>/dev/null | head -50 >> /tmp/issue-body.md || echo "No Kotlin error lines found" >> /tmp/issue-body.md
-          echo '```'>> /tmp/issue-body.md
-          echo '' >> /tmp/issue-body.md
-          echo '## Last 200 lines of gradle-build.log' >> /tmp/issue-body.md
-          echo '```'>> /tmp/issue-body.md
-          tail -200 apps/mobile/android/gradle-build.log 2>/dev/null >> /tmp/issue-body.md || echo "no gradle-build.log" >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
-          echo '' >> /tmp/issue-body.md
-          echo "Commit: ${{ github.sha }}" >> /tmp/issue-body.md
-          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
-          gh issue create --title "CI: APK build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
-# Force CI re-trigger - fix line corruption
