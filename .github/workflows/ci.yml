@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  issues: write
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,7 +28,7 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Run typecheck + lint (capture)
+      - name: Run typecheck + lint (capture + report)
         run: |
           set +e
           pnpm typecheck > typecheck.log 2>&1
@@ -42,7 +46,9 @@ jobs:
             echo '```'
           } > combined.log
           if [ "${tc}" -ne 0 ] || [ "${lc}" -ne 0 ]; then
-            gh issue create --title "CI: Typecheck/Lint failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            gh issue create --title "CI: Typecheck/Lint failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || {
+              echo "gh issue create failed; dumping log to step output:" ; cat combined.log ; cat gherr.txt
+            }
             exit 1
           fi
         env:
@@ -62,14 +68,14 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Build web (capture)
+      - name: Build web (capture + report)
         run: |
           set +e
           pnpm --filter @droidvibe/web build > build.log 2>&1
           b=$?
           if [ "${b}" -ne 0 ]; then
             { echo '## Web build (exit '${b}')'; echo '```'; cat build.log; echo '```'; } > combined.log
-            gh issue create --title "CI: Web build failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            gh issue create --title "CI: Web build failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || { echo "gh failed"; cat combined.log; cat gherr.txt; }
             exit 1
           fi
         env:
@@ -93,14 +99,14 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Run tests (capture)
+      - name: Run tests (capture + report)
         run: |
           set +e
           pnpm test > test.log 2>&1
           t=$?
           if [ "${t}" -ne 0 ]; then
             { echo '## Tests (exit '${t}')'; echo '```'; cat test.log; echo '```'; } > combined.log
-            gh issue create --title "CI: Test failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            gh issue create --title "CI: Test failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || { echo "gh failed"; cat combined.log; cat gherr.txt; }
             exit 1
           fi
         env:
@@ -120,7 +126,7 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Expo prebuild (Android, capture)
+      - name: Expo prebuild (Android, capture + report)
         working-directory: apps/mobile
         run: |
           set +e
@@ -128,7 +134,7 @@ jobs:
           p=$?
           if [ "${p}" -ne 0 ]; then
             { echo '## Expo prebuild (exit '${p}')'; echo '```'; cat prebuild.log; echo '```'; } > combined.log
-            gh issue create --title "CI: Expo prebuild failure (${GITHUB_SHA::7})" --body-file combined.log || true
+            gh issue create --title "CI: Expo prebuild failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || { echo "gh failed"; cat combined.log; cat gherr.txt; }
             exit 1
           fi
         env:
