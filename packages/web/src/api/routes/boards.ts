@@ -3,7 +3,7 @@ import { procedure } from '../../rpc.js';
 import { spawn } from 'node:child_process';
 import { env } from '../../env.js';
 
-interface BoardsIndexEntry {
+export interface BoardsIndexEntry {
   name: string;
   architecture: string;
   version: string;

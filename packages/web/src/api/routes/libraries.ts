@@ -3,7 +3,7 @@ import { procedure } from '../../rpc.js';
 import { spawn } from 'node:child_process';
 import { env } from '../../env.js';
 
-interface LibraryEntry {
+export interface LibraryEntry {
   name: string;
   version?: string;
   author?: string;

@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { procedure } from '../../rpc.js';
 import { prepareSketchJob, compileSketch, cleanupJob } from '../../arduino/cli.js';
 import { parseArduinoCliJson, explainDiagnostics } from '@droidvibe/shared';
-import { env } from '../../env.js';
+import { schema } from '@droidvibe/db';
+import { db } from '../context.js';
 import { nanoid } from 'nanoid';
 
 const CompileInput = z.object({
@@ -17,8 +18,20 @@ export const compile = procedure(CompileInput, async ({ input, ctx }) => {
   try {
     const build = await compileSketch(job.inoPath, input.fqbn);
     const diagnostics = explainDiagnostics(parseArduinoCliJson(build.stdout));
-    // On failure, never report ok. Diagnostics explain the real cause.
+    const buildId = nanoid();
+
     if (!build.ok) {
+      if (input.persist) {
+        await db.insert(schema.builds).values({
+          id: buildId,
+          userId: ctx.userId,
+          fqbn: input.fqbn,
+          ok: false,
+          diagnostics: JSON.stringify(diagnostics),
+          firmwarePath: null,
+          durationMs: build.durationMs,
+        });
+      }
       return {
         ok: false,
         diagnostics,
@@ -27,22 +40,31 @@ export const compile = procedure(CompileInput, async ({ input, ctx }) => {
         fqbn: input.fqbn,
         durationMs: build.durationMs,
         stdout: build.stdout,
-        buildId: undefined,
+        buildId: input.persist ? buildId : undefined,
       };
     }
-    const buildId = nanoid();
-    // TODO: persist build record to DB (ctx.userId, buildId) when persist=true.
-    void ctx;
-    void env;
+
+    if (input.persist) {
+      await db.insert(schema.builds).values({
+        id: buildId,
+        userId: ctx.userId,
+        fqbn: input.fqbn,
+        ok: true,
+        diagnostics: JSON.stringify(diagnostics),
+        firmwarePath: build.firmwarePath ?? null,
+        durationMs: build.durationMs,
+      });
+    }
+
     return {
       ok: true,
       diagnostics,
-      firmware: undefined, // firmware delivered as a signed download URL in prod
+      firmware: undefined,
       firmwarePath: build.firmwarePath ?? undefined,
       fqbn: input.fqbn,
       durationMs: build.durationMs,
       stdout: build.stdout,
-      buildId,
+      buildId: input.persist ? buildId : undefined,
     };
   } finally {
     await cleanupJob(job.jobDir);
