@@ -105,12 +105,29 @@ jobs:
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 2>/dev/null || true
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --clean
-      - name: Build debug APK
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+      - name: List generated Android project structure
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace --info
+        run: find . -maxdepth 3 -name '*.gradle' -o -name 'gradlew' -o -name 'settings.gradle' | head -20
+      - name: Show settings.gradle
+        working-directory: apps/mobile/android
+        run: cat settings.gradle 2>/dev/null || echo 'settings.gradle not found'
+      - name: Build debug APK (capture output)
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+        continue-on-error: true
+      - name: Show Gradle build log (last 100 lines)
+        working-directory: apps/mobile/android
+        run: tail -100 gradle-build.log || true
       - uses: actions/upload-artifact@v4
         with:
           name: droidvibe-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+        if: success()
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: apps/mobile/android/gradle-build.log
+          retention-days: 14
+        if: always()
