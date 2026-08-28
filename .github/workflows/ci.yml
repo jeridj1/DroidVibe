@@ -136,7 +136,7 @@ jobs:
       - name: SDK licenses
         run: yes |${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install SDK components
-        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'ndk;27.0.12077973' 'cmake;3.22.1' 2>/dev/null || true
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'ndk;27.1.12297006' 'cmake;3.22.1' 2>/dev/null || true
       - name: Expo prebuild
         working-directory: apps/mobile
         run: |
@@ -205,4 +205,19 @@ jobs:
           echo "APK build failed" > /tmp/issue.md
           echo "Commit: ${{ github.sha }}" >> /tmp/issue.md
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
+          echo "## gradle.properties" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          cat apps/mobile/android/gradle.properties >> /tmp/issue.md 2>/dev/null || echo "File not found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
+          echo "## NDK versions installed" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          ls ${ANDROID_HOME}/ndk/ 2>/dev/null || echo "No NDK found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
+          echo "## Gradle Build Log (last 150 lines)" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          tail -150 apps/mobile/android/gradle-build.log >> /tmp/issue.md 2>/dev/null || echo "No build log found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
           gh issue create --title "CI: APK build failed" --body-file /tmp/issue.md || true
