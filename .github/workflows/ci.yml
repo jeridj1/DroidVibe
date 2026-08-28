@@ -97,7 +97,7 @@ jobs:
         run: |
           echo '```' > /tmp/issue-body.md
           tail -150 test.log 2>/dev/null >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
+          echo '```'>> /tmp/issue-body.md
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
           gh issue create --title "CI: Test failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
@@ -128,14 +128,14 @@ jobs:
           echo '## Prebuild log (last 80 lines)' > /tmp/issue-body.md
           echo '```' >> /tmp/issue-body.md
           tail -80 apps/mobile/prebuild.log 2>/dev/null >> /tmp/issue-body.md || echo "no prebuild.log" >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
+          echo '```'>> /tmp/issue-body.md
           echo '' >> /tmp/issue-body.md
           echo "Commit: ${{ github.sha }}" >> /tmp/issue-body.md
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
           gh issue create --title "CI: Prebuild failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   apk-build:
-    name: Build Android APK
+    name: Build Android AP
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [quality, mobile-prebuild]
@@ -158,11 +158,11 @@ jobs:
         run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install Android SDK components
         run: |
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \\
-            'platforms;android-35' \\
-            'build-tools;35.0.0' \\
-            'platform-tools' \\
-            'ndk;27.0.12077973' \\
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+            'platforms;android-35' \
+            'build-tools;35.0.0' \
+            'platform-tools' \
+            'ndk;27.0.12077973' \
             'cmake;3.22.1' 2>/dev/null || true
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
@@ -229,16 +229,16 @@ jobs:
           echo '```' >> /tmp/issue-body.md
           echo '' >> /tmp/issue-body.md
           echo '## Gradle Build Log (Kotlin errors)' >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
+          echo '```'>> /tmp/issue-body.md
           grep -E "^e: |error:|Unresolved reference" apps/mobile/android/gradle-build.log 2>/dev/null | head -50 >> /tmp/issue-body.md || echo "No Kotlin error lines found" >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
+          echo '```'>> /tmp/issue-body.md
           echo '' >> /tmp/issue-body.md
           echo '## Last 200 lines of gradle-build.log' >> /tmp/issue-body.md
-          echo '```' >> /tmp/issue-body.md
+          echo '```'>> /tmp/issue-body.md
           tail -200 apps/mobile/android/gradle-build.log 2>/dev/null >> /tmp/issue-body.md || echo "no gradle-build.log" >> /tmp/issue-body.md
           echo '```' >> /tmp/issue-body.md
           echo '' >> /tmp/issue-body.md
           echo "Commit: ${{ github.sha }}" >> /tmp/issue-body.md
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
           gh issue create --title "CI: APK build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
-# Force CI re-trigger - fixed YAML indentation in Show Kotlin compiler errors step
+# Force CI re-trigger - fix line corruption
