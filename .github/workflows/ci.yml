@@ -27,14 +27,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: pnpm install --no-frozen-lockfile
-      - name: Run typecheck + lint (capture + report)
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Typecheck + Lint (capture)
         run: |
-          set +e
-          pnpm typecheck > typecheck.log 2>&1
-          tc=$?
-          pnpm lint > lint.log 2>&1
-          lc=$?
+          pnpm typecheck > typecheck.log 2>&1; tc=$?
+          pnpm lint > lint.log 2>&1; lc=$?
           {
             echo "## Typecheck (exit ${tc})"
             echo '```'
@@ -45,14 +43,17 @@ jobs:
             cat lint.log
             echo '```'
           } > combined.log
-          if [ "${tc}" -ne 0 ] || [ "${lc}" -ne 0 ]; then
-            gh issue create --title "CI: Typecheck/Lint failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || {
-              echo "gh issue create failed; dumping log to step output:" ; cat combined.log ; cat gherr.txt
-            }
-            exit 1
-          fi
+          [ "${tc}" -eq 0 ] && [ "${lc}" -eq 0 ]
+      - name: Report failure as issue
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f combined.log ]; then
+            gh issue create --title "CI: Typecheck/Lint failure (${GITHUB_SHA::7})" --body-file combined.log || echo "gh create failed"
+          else
+            gh issue create --title "CI: failure before checks (${GITHUB_SHA::7})" --body "A CI step failed before checks completed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || echo "gh create failed"
+          fi
 
   web-build:
     name: Build Web Backend
@@ -68,19 +69,23 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Build web (capture + report)
+      - name: Build web (capture)
         run: |
-          set +e
-          pnpm --filter @droidvibe/web build > build.log 2>&1
-          b=$?
-          if [ "${b}" -ne 0 ]; then
-            { echo '## Web build (exit '${b}')'; echo '```'; cat build.log; echo '```'; } > combined.log
-            gh issue create --title "CI: Web build failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || { echo "gh failed"; cat combined.log; cat gherr.txt; }
-            exit 1
-          fi
+          pnpm --filter @droidvibe/web build > build.log 2>&1; b=$?
+          { echo '## Web build (exit '${b}')'; echo '```'; cat build.log; echo '```'; } > combined.log
+          [ "${b}" -eq 0 ]
+      - name: Report failure as issue
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f combined.log ]; then
+            gh issue create --title "CI: Web build failure (${GITHUB_SHA::7})" --body-file combined.log || echo "gh create failed"
+          else
+            gh issue create --title "CI: Web build failure (${GITHUB_SHA::7})" --body "Step failed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || echo "gh create failed"
+          fi
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: web-dist
           path: packages/web/dist
@@ -99,18 +104,21 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Run tests (capture + report)
+      - name: Tests (capture)
         run: |
-          set +e
-          pnpm test > test.log 2>&1
-          t=$?
-          if [ "${t}" -ne 0 ]; then
-            { echo '## Tests (exit '${t}')'; echo '```'; cat test.log; echo '```'; } > combined.log
-            gh issue create --title "CI: Test failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || { echo "gh failed"; cat combined.log; cat gherr.txt; }
-            exit 1
-          fi
+          pnpm test > test.log 2>&1; t=$?
+          { echo '## Tests (exit '${t}')'; echo '```'; cat test.log; echo '```'; } > combined.log
+          [ "${t}" -eq 0 ]
+      - name: Report failure as issue
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f combined.log ]; then
+            gh issue create --title "CI: Test failure (${GITHUB_SHA::7})" --body-file combined.log || echo "gh create failed"
+          else
+            gh issue create --title "CI: Test failure (${GITHUB_SHA::7})" --body "Step failed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || echo "gh create failed"
+          fi
 
   mobile-prebuild:
     name: Expo Prebuild Validation
@@ -126,16 +134,19 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - name: Expo prebuild (Android, capture + report)
+      - name: Expo prebuild (Android, capture)
         working-directory: apps/mobile
         run: |
-          set +e
-          pnpm exec expo prebuild --platform android --no-install --clean > prebuild.log 2>&1
-          p=$?
-          if [ "${p}" -ne 0 ]; then
-            { echo '## Expo prebuild (exit '${p}')'; echo '```'; cat prebuild.log; echo '```'; } > combined.log
-            gh issue create --title "CI: Expo prebuild failure (${GITHUB_SHA::7})" --body-file combined.log --label "ci" 2>gherr.txt || { echo "gh failed"; cat combined.log; cat gherr.txt; }
-            exit 1
-          fi
+          pnpm exec expo prebuild --platform android --no-install --clean > prebuild.log 2>&1; p=$?
+          { echo '## Expo prebuild (exit '${p}')'; echo '```'; cat prebuild.log; echo '```'; } > combined.log
+          [ "${p}" -eq 0 ]
+      - name: Report failure as issue
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f combined.log ]; then
+            gh issue create --title "CI: Expo prebuild failure (${GITHUB_SHA::7})" --body-file combined.log || echo "gh create failed"
+          else
+            gh issue create --title "CI: Expo prebuild failure (${GITHUB_SHA::7})" --body "Step failed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || echo "gh create failed"
+          fi
