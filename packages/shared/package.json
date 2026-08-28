@@ -1,0 +1,27 @@
+{
+  "name": "@droidvibe/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./boards": "./src/boards.ts",
+    "./diagnostics": "./src/diagnostics.ts",
+    "./hex": "./src/hex.ts",
+    "./uf2": "./src/uf2.ts",
+    "./protocols": "./src/protocols/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
