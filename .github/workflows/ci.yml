@@ -28,7 +28,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
@@ -46,7 +45,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - name: Build web
         run: pnpm --filter @droidvibe/web build
@@ -68,7 +66,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
 
@@ -87,7 +84,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - name: Expo prebuild
         working-directory: apps/mobile
@@ -115,7 +111,7 @@ jobs:
     needs: [quality, mobile-prebuild]
     env:
       EXPO_NO_TELEMETRY: "1"
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.configuration-cache=true -Xmx3g"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -124,7 +120,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
