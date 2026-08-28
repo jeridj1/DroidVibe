@@ -22,7 +22,7 @@ export interface HexImage {
   dataByteCount: number;
 }
 
-const HEX_RE = /^:([0-9A-Fa-f]+)$/;
+const HEX_RE = /^:([0-9A-Fa-f]+)$/
 
 function parseByte(str: string, offset: number): number {
   return parseInt(str.slice(offset, offset + 2), 16);
@@ -48,13 +48,13 @@ export function parseHexRecords(text: string): HexRecord[] {
     const body = m[1];
     const byteCount = parseByte(body, 0);
     // body layout: byteCount(2) addr(4) type(2) data(byteCount*2) checksum(2)
-    const expectedLen = 4 + 4 + 2 + byteCount * 2 + 2;
+    const expectedLen = 2 + 4 + 2 + byteCount * 2 + 2;
     if (body.length !== expectedLen) {
       throw new HexParseError(`Length mismatch on HEX line ${i + 1}`);
     }
 
     const recordType = parseByte(body, 6);
-    const addr = parseInt(body.slice(4, 8), 16);
+    const addr = parseInt(body.slice(2, 6), 16);
 
     // checksum covers count, addr-high, addr-low, type, data bytes
     let sum = byteCount + (addr >> 8) + (addr & 0xff) + recordType;
