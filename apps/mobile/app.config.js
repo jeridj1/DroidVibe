@@ -14,15 +14,17 @@ function withKotlinVersion(config) {
     const props = cfg.modResults.properties;
 
     // --- Kotlin version: 1.9.24 -> 1.9.25 for Compose Compiler 1.5.15 ---
+    // The Expo SDK 52 build.gradle reads: findProperty('android.kotlinVersion')
+    // So the property name in gradle.properties MUST be 'android.kotlinVersion'
     let foundKotlin = false;
     for (const prop of props) {
-      if (prop.key === 'kotlinVersion') {
+      if (prop.key === 'android.kotlinVersion') {
         prop.value = '1.9.25';
         foundKotlin = true;
       }
     }
     if (!foundKotlin) {
-      props.push({ key: 'kotlinVersion', value: '1.9.25' });
+      props.push({ key: 'android.kotlinVersion', value: '1.9.25' });
     }
 
     // --- JVM target validation: warning instead of error (SDK 52 + Java 17) ---
