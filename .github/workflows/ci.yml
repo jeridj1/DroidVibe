@@ -28,6 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
@@ -45,6 +46,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - name: Build web
         run: pnpm --filter @droidvibe/web build
@@ -66,6 +68,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
 
@@ -84,6 +87,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - name: Expo prebuild
         working-directory: apps/mobile
@@ -107,10 +111,11 @@ jobs:
   apk-build:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     needs: [quality, mobile-prebuild]
     env:
       EXPO_NO_TELEMETRY: "1"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.configuration-cache=true -Xmx3g"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -119,10 +124,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            apps/mobile/android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
       - run: pnpm install --no-frozen-lockfile
       - name: SDK licenses
         run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
@@ -152,11 +166,17 @@ jobs:
           if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
             echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
           fi
+          if ! grep -q 'org.gradle.parallel' gradle.properties; then
+            echo "org.gradle.parallel=true" >> gradle.properties
+          fi
+          if ! grep -q 'org.gradle.caching' gradle.properties; then
+            echo "org.gradle.caching=true" >> gradle.properties
+          fi
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace 2>&1 | tee gradle-build.log
       - name: Show errors
         working-directory: apps/mobile/android
         if: always()
