@@ -6,7 +6,7 @@
  * configurable via env. This runs on the cloud backend, never on the phone.
  */
 import { spawn } from 'node:child_process';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { env } from '../env.js';
@@ -37,7 +37,6 @@ function runCli(args: string[], opts: { cwd?: string; env?: Record<string, strin
 
 /** Core/board management: ensure a board core is installed for an FQBN. */
 export async function ensureCoreInstalled(fqbn: string): Promise<void> {
-  // fqbn like "arduino:avr:uno" -> core id "arduino:avr"
   const parts = fqbn.split(':');
   if (parts.length < 2) return;
   const core = parts.slice(0, 2).join(':');
@@ -75,7 +74,7 @@ export async function prepareSketchJob(
   return { jobDir, sketchDir, inoPath };
 }
 
-/** Compile a sketch, returning the parsed result + firmware path on success. */
+/** Compile a sketch, returning the parsed result + firmware data on success. */
 export async function compileSketch(
   inoPath: string,
   fqbn: string,
@@ -83,6 +82,7 @@ export async function compileSketch(
   ok: boolean;
   stdout: string;
   firmwarePath: string | null;
+  firmwareBase64: string | null;
   durationMs: number;
 }> {
   await ensureCoreInstalled(fqbn);
@@ -99,16 +99,24 @@ export async function compileSketch(
   const durationMs = Date.now() - start;
   const ok = r.code === 0;
   let firmwarePath: string | null = null;
+  let firmwareBase64: string | null = null;
   if (ok) {
-    // arduino-cli writes <name>.hex (avr) or <name>.bin in the build path.
     try {
-      const parsed = JSON.parse(r.stdout || '{}');
-      firmwarePath = parsed.build_path ? join(parsed.build_path, 'firmware.hex') : null;
+      const entries = await readdir(buildDir);
+      const uf2 = entries.find((f) => f.endsWith('.uf2'));
+      const hex = entries.find((f) => f.endsWith('.hex'));
+      const bin = entries.find((f) => f.endsWith('.bin') && !f.endsWith('.elf.bin') && !f.endsWith('.map'));
+      const artifact = uf2 ?? hex ?? bin;
+      if (artifact) {
+        firmwarePath = join(buildDir, artifact);
+        const data = await readFile(firmwarePath);
+        firmwareBase64 = data.toString('base64');
+      }
     } catch {
-      firmwarePath = join(buildDir, 'firmware.hex');
+      // Could not read firmware
     }
   }
-  return { ok, stdout: r.output, firmwarePath, durationMs };
+  return { ok, stdout: r.output, firmwarePath, firmwareBase64, durationMs };
 }
 
 /** Remove a job directory once it is no longer needed. */

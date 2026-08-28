@@ -59,7 +59,7 @@ export const compile = procedure(CompileInput, async ({ input, ctx }) => {
     return {
       ok: true,
       diagnostics,
-      firmware: undefined,
+      firmware: build.firmwareBase64 ?? undefined,
       firmwarePath: build.firmwarePath ?? undefined,
       fqbn: input.fqbn,
       durationMs: build.durationMs,

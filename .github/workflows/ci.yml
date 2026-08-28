@@ -142,7 +142,13 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install Android SDK components
-        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 2>/dev/null || true
+        run: |
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+            'platforms;android-35' \
+            'build-tools;35.0.0' \
+            'platform-tools' \
+            'ndk;27.0.12077973' \
+            'cmake;3.22.1' 2>/dev/null || true
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
@@ -172,7 +178,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo 'Gradle `assembleDebug` failed. Last 200 lines of the build log:'
+            echo 'Gradle `assembleDebug` failed.'
+            echo ''
+            echo '## Kotlin compilation errors'
+            echo '```'
+            grep -E '^e: |error:|Unresolved reference|cannot find|FAILURE|What went wrong' apps/mobile/android/gradle-build.log 2>/dev/null | head -80 || echo "no errors found in grep"
+            echo '```'
+            echo ''
+            echo '## Last 200 lines of build log'
             echo '```'
             tail -200 apps/mobile/android/gradle-build.log 2>/dev/null || echo "no gradle-build.log found"
             echo '```'
