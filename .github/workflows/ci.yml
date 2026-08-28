@@ -10,6 +10,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   quality:
     name: Typecheck & Lint
@@ -24,8 +28,23 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm lint
+      - run: pnpm typecheck 2>&1 | tee typecheck.log
+      - run: pnpm lint 2>&1 | tee lint.log
+      - name: Report failure as issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo '## Typecheck / Lint output'
+            echo '```'
+            cat typecheck.log lint.log 2>/dev/null | tail -150
+            echo '```'
+            echo ""
+            echo "Commit: ${{ github.sha }}"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > /tmp/issue-body.md
+          gh issue create --title "CI: Typecheck/Lint failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   web-build:
     name: Build Web Backend
@@ -41,11 +60,18 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm --filter @droidvibe/web build
+      - run: pnpm --filter @droidvibe/web build 2>&1 | tee web-build.log
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: packages/web/dist
+      - name: Report failure as issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          { echo '```'; tail -80 web-build.log 2>/dev/null; echo '```'; echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } > /tmp/issue-body.md
+          gh issue create --title "CI: Web build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   test:
     name: Unit Tests
@@ -61,7 +87,14 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm test
+      - run: pnpm test 2>&1 | tee test.log
+      - name: Report failure as issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          { echo '```'; tail -150 test.log 2>/dev/null; echo '```'; echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } > /tmp/issue-body.md
+          gh issue create --title "CI: Test failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   mobile-prebuild:
     name: Expo Prebuild Validation
@@ -79,7 +112,14 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean
+        run: pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
+      - name: Report failure as issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          { echo '```'; tail -80 prebuild.log 2>/dev/null; echo '```'; echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } > /tmp/issue-body.md
+          gh issue create --title "CI: Prebuild failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   apk-build:
     name: Build Android APK
@@ -100,34 +140,44 @@ jobs:
           java-version: '17'
       - run: pnpm install --no-frozen-lockfile
       - name: Accept Android SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+        run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install Android SDK components
-        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 2>/dev/null || true
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 2>/dev/null || true
       - name: Expo prebuild (Android)
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
-      - name: List generated Android project structure
+      - name: Build debug APK
         working-directory: apps/mobile/android
-        run: find . -maxdepth 3 -name '*.gradle' -o -name 'gradlew' -o -name 'settings.gradle' | head -20
-      - name: Show settings.gradle
-        working-directory: apps/mobile/android
-        run: cat settings.gradle 2>/dev/null || echo 'settings.gradle not found'
-      - name: Build debug APK (capture output)
-        working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
-        continue-on-error: true
-      - name: Show Gradle build log (last 100 lines)
-        working-directory: apps/mobile/android
-        run: tail -100 gradle-build.log || true
-      - uses: actions/upload-artifact@v4
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: droidvibe-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
-          retention-days: 14
-        if: success()
-      - uses: actions/upload-artifact@v4
+          retention-days: 30
+      - name: Upload gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: gradle-build-log
           path: apps/mobile/android/gradle-build.log
-          retention-days: 14
-        if: always()
+          retention-days: 30
+      - name: Report gradle failure as issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo 'Gradle `assembleDebug` failed. Last 200 lines of the build log:'
+            echo '```'
+            tail -200 apps/mobile/android/gradle-build.log 2>/dev/null || echo "no gradle-build.log found"
+            echo '```'
+            echo ""
+            echo "Commit: ${{ github.sha }}"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > /tmp/issue-body.md
+          gh issue create --title "CI: APK build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
