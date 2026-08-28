@@ -135,17 +135,110 @@ jobs:
           gh issue create --title "CI: Prebuild failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
 
   apk-build:
-    name: Build Android APK[Ë[ÛX[K[]\Ý[Y[Ý][Z[]\ÎYYÎÜ]X[]K[Ø[K\XZ[B[V×Ó×ÕSSQUNHÝ\ÎH\Ù\ÎXÝ[ÛËØÚXÚÛÝ]H\Ù\ÎKØXÝ[Û\Ù]\Ú]\Ú[ÛKLH\Ù\ÎXÝ[ÛËÜÙ]\[ÙPÚ]ÙK]\Ú[ÛH\Ù\ÎXÝ[ÛËÜÙ]\Z]PÚ]\ÝX][Û[]\[]K]\Ú[Û	ÌMÉÂH[H[Ý[K[ËYÞ[[ØÚÙ[BH[YNXØÙ\[ÚYÑÈXÙ[Ù\Â[Y\È	ÐSÒQÒÓQ_KØÛY[K]ÛÛËÛ]\ÝØ[ÜÙÛX[YÙ\K[XÙ[Ù\ÈÙ]Û[HYBH[YN[Ý[[ÚYÑÈÛÛ\Û[Â[	ÐSÒQÒÓQ_KØÛY[K]ÛÛËÛ]\ÝØ[ÜÙÛX[YÙ\	Ü]Ü\ÎØ[ÚYLÍIÈ	ØZ[]ÛÛÎÌÍK	È	Ü]ÜK]ÛÛÉÈ	ÛÎÌËLÍÎMÌÉÈ	ØÛXZÙNÌËIÈÙ]Û[YBH[YN^ÈXZ[
-[ÚY
-BÛÜÚ[ËY\XÝÜN\ËÛ[Ø[B[H^XÈ^ÈXZ[K\]ÜH[ÚYK[ËZ[Ý[KXÛX[HYHXZ[ÙÂH[YN]ÚÛÝ[\Ú[ÛÜÛÛ\ÜÙHÛÛ\[\ÛÛ\]X[]BÛÜÚ[ËY\XÝÜN\ËÛ[Ø[KØ[ÚY[YÈYÜYKÜ\Y\ÈNÈ[ÙYZH	ÜËÚÛÝ[\Ú[ÛKÚÛÝ[\Ú[ÛLKKKÉÈÜYKÜ\Y\ÂXÚÈ]ÚYÛÝ[\Ú[ÛÈKKHÜ\ZHÛÝ[ÜYKÜ\Y\ÈYB[ÙBXÚÈÛÝ[\Ú[ÛLKKHÜYKÜ\Y\ÂXÚÈYYÛÝ[\Ú[ÛKKHBH[YNXYÛÜÙHZ[Ý]BÛÜÚ[ËY\XÝÜN\ËÛ[Ø[KØ[ÚY[XÚÈOOHÜYKÜ\Y\ÈOOHØ]ÜYKÜ\Y\ÈÙ]Û[XÚÈÈÜYKÜ\Y\ÈXÚÈOOHÙ][ÜËÜYHOOHØ]Ù][ÜËÜYHÙ]Û[XÚÈÈÙ][ÜËÜYHXÚÈOOH\ØZ[ÜYH^\ÝÈOOHÈ[H\ØZ[ÜYHÙ]Û[XÚÈÈ\ØZ[ÜYHH[YNZ[XYÈTÂÛÜÚ[ËY\XÝÜN\ËÛ[Ø[KØ[ÚY[Ù][È\YZ[ÙÜY]È\ÜÙ[XQXYÈK[ËYY[[ÛK\ÝXÚÝXÙHK[X^]ÛÜÙ\ÏLQÜËÜYKX\ÜÏHV^ÙÈHYHÜYKXZ[ÙÂH[YNÚÝÈÛÝ[ÛÛ\[\\ÜÂÛÜÚ[ËY\XÝÜN\ËÛ[Ø[KØ[ÚYY[Ø^\Ê
-B[Ü\QHN\Ü[\ÛÛYY\[ÙHÜYKXZ[ÙÈXYMLXÚÈÈÛÝ[\Ü[\ÈÝ[H[YNÚÝÈÜYHZ[ÙÈ
-\ÝL[\ÊBÛÜÚ[ËY\XÝÜN\ËÛ[Ø[KØ[ÚYY[Ø^\Ê
-B[Z[LLÜYKXZ[ÙÈYBH\Ù\ÎXÝ[ÛËÝ\ØYX\YXÝÚ][YNÚYXKYXYËX\Â]\ËÛ[Ø[KØ[ÚYØ\ØZ[ÛÝ]]ËØ\ËÙXYËÊ\Â][[ÛY^\ÎMY[Ø^\Ê
-BH\Ù\ÎXÝ[ÛËÝ\ØYX\YXÝÚ][YNÜYKXZ[[ÙÂ]\ËÛ[Ø[KØ[ÚYÙÜYKXZ[ÙÂ][[ÛY^\ÎMY[Ø^\Ê
-BH\Ù\ÎXÝ[ÛËÝ\ØYX\YXÝÚ][YNXZ[[ÙÂ]\ËÛ[Ø[KÜXZ[ÙÂ][[ÛY^\ÎMY[Ø^\Ê
-BH[YN\ÜZ[\H\È\ÜÝYBYZ[\J
-B[ÒÕÒÑS	ÞÈÙXÜ]ËÒUPÕÒÑS_B[XÚÈ	ÈÈÈXZ[ÙÈ
-\Ý[\ÊIÈÝ\Ú\ÜÝYKXÙKYXÚÈ	Ø	ÈÝ\Ú\ÜÝYKXÙKYZ[M\ËÛ[Ø[KÜXZ[ÙÈÙ]Û[Ý\Ú\ÜÝYKXÙKYXÚÈÈXZ[ÙÈÝ\Ú\ÜÝYKXÙKYXÚÈ	Ø	ÈÝ\Ú\ÜÝYKXÙKYXÚÈ	ÉÈÝ\Ú\ÜÝYKXÙKYXÚÈ	ÈÈÈÜYHZ[ÙÈ
-ÛÝ[\ÜÊIÈÝ\Ú\ÜÝYKXÙKYXÚÈ	Ø	ÈÝ\Ú\ÜÝYKXÙKYÜ\QHN\Ü[\ÛÛYY\[ÙH\ËÛ[Ø[KØ[ÚYÙÜYKXZ[ÙÈÙ]Û[XYMLÝ\Ú\ÜÝYKXÙKYXÚÈÈÛÝ[\Ü[\ÈÝ[Ý\Ú\ÜÝYKXÙKYXÚÈ	Ø	ÈÝ\Ú\ÜÝYKXÙKYXÚÈ	ÉÈÝ\Ú\ÜÝYKXÙKYXÚÈ	ÈÈÈ\Ý[\ÈÙÜYKXZ[ÙÉÈÝ\Ú\ÜÝYKXÙKYXÚÈ	Ø	ÈÝ\Ú\ÜÝYKXÙKYZ[L\ËÛ[Ø[KØ[ÚYÙÜYKXZ[ÙÈÙ]Û[Ý\Ú\ÜÝYKXÙKYXÚÈÈÜYKXZ[ÙÈÝ\Ú\ÜÝYKXÙKYXÚÈ	Ø	ÈÝ\Ú\ÜÝYKXÙKYXÚÈ	ÉÈÝ\Ú\ÜÝYKXÙKYXÚÈÛÛ[Z]	ÞÈÚ]XÚH_HÝ\Ú\ÜÝYKXÙKYXÚÈ[	ÞÈÚ]XÙ\\Ý\_KÉÞÈÚ]X\ÜÚ]ÜH_KØXÝ[ÛËÜ[ËÉÞÈÚ]X[ÚY_HÝ\Ú\ÜÝYKXÙKYÚ\ÜÝYHÜX]HK]]HÒNTÈZ[Z[\H
-	ÞÈÚ]XÚH_JHKXÙKY[HÝ\Ú\ÜÝYKXÙKYYB
-# CI v3 - re-trigger after transient failure
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [quality, mobile-prebuild]
+    env:
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pnpm install --no-frozen-lockfile
+      - name: Accept Android SDK licenses
+        run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+      - name: Install Android SDK components
+        run: |
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \\
+            'platforms;android-35' \\
+            'build-tools;35.0.0' \\
+            'platform-tools' \\
+            'ndk;27.0.12077973' \\
+            'cmake;3.22.1' 2>/dev/null || true
+      - name: Expo prebuild (Android)
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
+      - name: Patch Kotlin version for Compose Compiler compatibility
+        working-directory: apps/mobile/android
+        run: |
+          if [ -f gradle.properties ]; then
+            sed -i 's/kotlinVersion=.*/kotlinVersion=1.9.25/' gradle.properties
+            echo "Patched Kotlin version to 1.9.25"
+            grep -i kotlin gradle.properties || true
+          else
+            echo "kotlinVersion=1.9.25" >> gradle.properties
+            echo "Added Kotlin version 1.9.25"
+          fi
+      - name: Diagnose build state
+        working-directory: apps/mobile/android
+        run: |
+          echo "=== gradle.properties ==="
+          cat gradle.properties 2>/dev/null || echo "no gradle.properties"
+          echo "=== settings.gradle ==="
+          cat settings.gradle 2>/dev/null || echo "no settings.gradle"
+          echo "=== app/build.gradle exists ==="
+          ls -la app/build.gradle 2>/dev/null || echo "no app/build.gradle"
+      - name: Build debug APK
+        working-directory: apps/mobile/android
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g" 2>&1 | tee gradle-build.log
+      - name: Show Kotlin compiler errors
+        working-directory: apps/mobile/android
+        if: always()
+        run: grep -E "^e: |error:|Unresolved reference" gradle-build.log | head -50 || echo "No Kotlin error lines found"
+      - name: Show Gradle build log (last 100 lines)
+        working-directory: apps/mobile/android
+        if: always()
+        run: tail -100 gradle-build.log || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+        if: always()
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: apps/mobile/android/gradle-build.log
+          retention-days: 14
+        if: always()
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-log
+          path: apps/mobile/prebuild.log
+          retention-days: 14
+        if: always()
+      - name: Report failure as issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo '## Prebuild log (last 40 lines)' > /tmp/issue-body.md
+          echo '```' >> /tmp/issue-body.md
+          tail -40 apps/mobile/prebuild.log 2>/dev/null >> /tmp/issue-body.md || echo "no prebuild.log" >> /tmp/issue-body.md
+          echo '```' >> /tmp/issue-body.md
+          echo '' >> /tmp/issue-body.md
+          echo '## Gradle Build Log (Kotlin errors)' >> /tmp/issue-body.md
+          echo '```' >> /tmp/issue-body.md
+          grep -E "^e: |error:|Unresolved reference" apps/mobile/android/gradle-build.log 2>/dev/null | head -50 >> /tmp/issue-body.md || echo "No Kotlin error lines found" >> /tmp/issue-body.md
+          echo '```' >> /tmp/issue-body.md
+          echo '' >> /tmp/issue-body.md
+          echo '## Last 200 lines of gradle-build.log' >> /tmp/issue-body.md
+          echo '```' >> /tmp/issue-body.md
+          tail -200 apps/mobile/android/gradle-build.log 2>/dev/null >> /tmp/issue-body.md || echo "no gradle-build.log" >> /tmp/issue-body.md
+          echo '```' >> /tmp/issue-body.md
+          echo '' >> /tmp/issue-body.md
+          echo "Commit: ${{ github.sha }}" >> /tmp/issue-body.md
+          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md
+          gh issue create --title "CI: APK build failure (${{ github.sha }})" --body-file /tmp/issue-body.md || true
+# Force CI re-trigger - fixed YAML indentation in Show Kotlin compiler errors step
