@@ -90,7 +90,23 @@ jobs:
         run: |
           pnpm exec expo prebuild \
             --platform android \
-            --no-install --clean
+            --no-install --clean 2>&1 | tee prebuild.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prebuild-log
+          path: apps/mobile/prebuild.log
+      - name: Report error
+        if: failure()
+        env:
+          GH_TOKEN: ${GITHUB_TOKEN}
+        run: |
+          echo "Prebuild failed" > /tmp/issue.md
+          echo "See prebuild-log artifact" >> /tmp/issue.md
+          tail -80 apps/mobile/prebuild.log >> /tmp/issue.md
+          gh issue create \
+            --title "CI: Prebuild failed" \
+            --body-file /tmp/issue.md || true
 
   apk-build:
     name: Build Android APK
