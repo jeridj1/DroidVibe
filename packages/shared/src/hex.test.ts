@@ -12,7 +12,9 @@ describe('Intel HEX', () => {
   });
 
   it('rejects a bad checksum', () => {
-    const bad = ':0100000000FF'; // wrong checksum (00 is data, checksum should be ~0)
+    // 01 byte at 0000, type 00 (data), data 0x00, correct checksum = 0xFF
+    // Use 0xFE as a deliberately wrong checksum to trigger a HexParseError.
+    const bad = ':0100000000FE';
     expect(() => parseHexRecords(bad)).toThrow(HexParseError);
   });
 
