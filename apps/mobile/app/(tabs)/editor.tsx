@@ -5,7 +5,7 @@ import { useTheme } from '@/src/theme/ThemeProvider';
 import { CodeEditor } from '@/src/components/CodeEditor';
 import { Button, Badge, Row, SectionTitle, Card } from '@/src/components/ui';
 import { api } from '@/src/lib/api';
-import type { Diagnostic, UploadStage } from '@droidvibe/shared';
+import type { Diagnostic } from '@droidvibe/shared';
 
 const DEFAULT_CODE = `// DroidVibe — Blink
 void setup() {
@@ -29,7 +29,6 @@ const BOARDS = [
   { fqbn: 'esp32:esp32:esp32', name: 'ESP32' },
 ];
 
-const STAGE_ORDER: UploadStage[] = ['detected', 'selected', 'connected', 'compiling', 'uploading', 'verified'];
 
 export default function EditorScreen() {
   const { palette } = useTheme();

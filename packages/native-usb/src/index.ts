@@ -36,13 +36,18 @@ export interface DroidVibeUsbModuleType {
 export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
   try {
     // expo-modules autolinking exposes the native module under this name.
-    const NativeModules = (globalThis as any).nativeModulesProxy ?? (globalThis as any).NativeModules;
+    const NativeModules =
+      (globalThis as any).nativeModulesProxy ?? (globalThis as any).NativeModules;
     const mod = NativeModules?.DroidVibeUsb;
     if (mod) return mod as DroidVibeUsbModuleType;
-    // Fallback: require from expo-modules-core
-    const modules = require('expo-modules-core');
-    const m = modules.NativeModulesProxy?.DroidVibeUsb;
-    return m ? (m as DroidVibeUsbModuleType) : null;
+    // Fallback: expo-modules-core autolinking (guarded; not present in Expo Go).
+    const req = (globalThis as any).require;
+    if (typeof req === 'function') {
+      const modules = req('expo-modules-core');
+      const m = modules?.NativeModulesProxy?.DroidVibeUsb;
+      if (m) return m as DroidVibeUsbModuleType;
+    }
+    return null;
   } catch {
     return null;
   }
