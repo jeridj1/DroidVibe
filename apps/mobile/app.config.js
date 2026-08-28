@@ -1,26 +1,54 @@
 /**
- * DroidVibe Expo app config with Kotlin version override.
+ * DroidVibe Expo app config with Kotlin version override + JVM target fix.
  *
  * Expo SDK 52 ships with Kotlin 1.9.24, but the Compose Compiler 1.5.15
  * (used by expo-modules-core with newArchEnabled) requires Kotlin 1.9.25.
- * This config plugin patches gradle.properties after prebuild to fix the
- * version mismatch.
+ * Additionally, SDK 52 + Java 17 can trigger JVM target mismatch errors
+ * between compileJavaWithJavac (17) and kspReleaseKotlin (21).
+ * This config plugin patches gradle.properties after prebuild to fix both.
  */
 const { withGradleProperties } = require('expo/config-plugins');
 
 function withKotlinVersion(config) {
   return withGradleProperties(config, (cfg) => {
     const props = cfg.modResults.properties;
-    let found = false;
+
+    // --- Kotlin version: 1.9.24 -> 1.9.25 for Compose Compiler 1.5.15 ---
+    let foundKotlin = false;
     for (const prop of props) {
       if (prop.key === 'kotlinVersion') {
         prop.value = '1.9.25';
-        found = true;
+        foundKotlin = true;
       }
     }
-    if (!found) {
+    if (!foundKotlin) {
       props.push({ key: 'kotlinVersion', value: '1.9.25' });
     }
+
+    // --- JVM target validation: warning instead of error (SDK 52 + Java 17) ---
+    let foundJvmMode = false;
+    for (const prop of props) {
+      if (prop.key === 'kotlin.jvm.target.validation.mode') {
+        prop.value = 'warning';
+        foundJvmMode = true;
+      }
+    }
+    if (!foundJvmMode) {
+      props.push({ key: 'kotlin.jvm.target.validation.mode', value: 'warning' });
+    }
+
+    // --- JVM args: prevent OOM on CI runners ---
+    let foundJvmArgs = false;
+    for (const prop of props) {
+      if (prop.key === 'org.gradle.jvmargs') {
+        prop.value = '-Xmx3g';
+        foundJvmArgs = true;
+      }
+    }
+    if (!foundJvmArgs) {
+      props.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
+    }
+
     return cfg;
   });
 }
