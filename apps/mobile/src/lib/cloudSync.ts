@@ -4,7 +4,7 @@
  * Never silently swallows errors — cloud failures are surfaced to the caller.
  */
 import { api } from './api';
-import { saveLocalSketch, getLocalSketches, type LocalSketch } from './offlineSketches';
+import { saveLocalSketch, type LocalSketch } from './offlineSketches';
 
 export interface SyncResult {
   local: LocalSketch;
