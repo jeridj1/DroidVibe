@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle, type AccessibilityState, AccessibilityRole } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { useTheme } from '@/src/theme/ThemeProvider';
 
 export function Card({ children, style, accessibilityLabel }: { children: React.ReactNode; style?: ViewStyle; accessibilityLabel?: string }) {
@@ -9,7 +9,7 @@ export function Card({ children, style, accessibilityLabel }: { children: React.
       style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }, style]}
       accessible={!!accessibilityLabel}
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole={AccessibilityRole.Summary}
+      accessibilityRole="summary"
     >
       {children}
     </View>
@@ -48,10 +48,10 @@ export function Button({
       onPress={onPress}
       disabled={disabled}
       testID={testID}
-      accessibilityRole={AccessibilityRole.Button}
+      accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={accessibilityHint}
-      accessibilityState={disabled ? { disabled: true } as AccessibilityState : undefined}
+      accessibilityState={disabled ? { disabled: true } : undefined}
       style={({ pressed }) => [
         styles.btn,
         { backgroundColor: bg, borderColor: variant === 'ghost' ? palette.surfaceBorder : 'transparent', opacity: pressed || disabled ? 0.6 : 1 },
@@ -78,7 +78,7 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
       style={[styles.badge, { backgroundColor: map.bg }]}
       accessible
       accessibilityLabel={label}
-      accessibilityRole={AccessibilityRole.Text}
+      accessibilityRole="text"
     >
       <Text style={{ color: map.fg, fontSize: 11, fontWeight: '700' }} allowFontScaling>{label}</Text>
     </View>
@@ -92,7 +92,7 @@ export function SectionTitle({ title, subtitle }: { title: string; subtitle?: st
       style={styles.section}
       accessible
       accessibilityLabel={subtitle ? `${title}: ${subtitle}` : title}
-      accessibilityRole={AccessibilityRole.Header}
+      accessibilityRole="header"
     >
       <Text style={{ color: palette.text, fontSize: 17, fontWeight: '800' }} allowFontScaling>{title}</Text>
       {subtitle ? <Text style={{ color: palette.textMuted, fontSize: 12 }} allowFontScaling>{subtitle}</Text> : null}
