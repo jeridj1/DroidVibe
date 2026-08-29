@@ -96,7 +96,7 @@ class DroidVibeUsbModule : Module() {
 
     override fun definition() = ModuleDefinition {
         Name("DroidVibeUsb")
-        Events("onUsbData", "onDeviceEvent")
+        Events("onUsbData", "onDeviceEvent", "onUploadProgress")
 
         OnCreate {
             val filter = IntentFilter().apply {
@@ -147,6 +147,7 @@ class DroidVibeUsbModule : Module() {
                     android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
                 )
                 usbManager.requestPermission(device, pi)
+
             } catch (e: Exception) {
                 permissionPromises.remove(deviceId)
                 promise.reject("USB_PERMISSION_FAILED", e.message ?: "requestPermission failed", e)
