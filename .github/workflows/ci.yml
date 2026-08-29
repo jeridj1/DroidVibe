@@ -146,6 +146,19 @@ jobs:
         with:
           name: prebuild-apk-log
           path: apps/mobile/prebuild-apk.log
+      - name: Debug prebuild output
+        working-directory: apps/mobile
+        if: always()
+        run: |
+          echo "=== Checking if config plugins ran ==="
+          echo "--- prebuild-apk.log (plugin-related lines) ---"
+          grep -i "plugin\|config\|buildConfig\|withApp\|withGradle\|error\|warn" prebuild-apk.log | head -30 || echo "No matching lines found"
+          echo "--- gradle.properties (checking for -Xmx3g from plugin) ---"
+          grep 'org.gradle.jvmargs' android/gradle.properties 2>/dev/null || echo "gradle.properties not found"
+          echo "--- app/build.gradle (buildConfig) ---"
+          grep 'buildConfig' android/app/build.gradle 2>/dev/null || echo "buildConfig not found in app/build.gradle"
+          echo "--- app/build.gradle (namespace) ---"
+          grep 'namespace' android/app/build.gradle 2>/dev/null || echo "namespace not found in app/build.gradle"
       - name: Patch build config
         working-directory: apps/mobile/android
         if: success()
@@ -163,31 +176,58 @@ jobs:
           if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
             echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
           fi
-          if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
+          # Fix jvmargs: replace existing value instead of appending
+          if grep -q '^org.gradle.jvmargs' gradle.properties; then
+            sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx3g/' gradle.properties
+          else
             echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
           fi
-          if ! grep -q 'org.gradle.parallel' gradle.properties; then
+          # Fix parallel: use ^ anchor to avoid matching commented lines
+          if grep -q '^org.gradle.parallel' gradle.properties; then
+            sed -i 's/^org.gradle.parallel=.*/org.gradle.parallel=true/' gradle.properties
+          else
             echo "org.gradle.parallel=true" >> gradle.properties
           fi
-          if ! grep -q 'org.gradle.caching' gradle.properties; then
+          if grep -q '^org.gradle.caching' gradle.properties; then
+            sed -i 's/^org.gradle.caching=.*/org.gradle.caching=true/' gradle.properties
+          else
             echo "org.gradle.caching=true" >> gradle.properties
           fi
           echo "=== Patching build.gradle NDK Version ==="
           if [ -f build.gradle ]; then
             sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
           fi
-          echo "=== Patching app/build.gradle for BuildConfig (AGP 8.x) ==="
+          echo "=== Patching app/build.gradle for BuildConfig + namespace (AGP 8.x) ==="
           if [ -f app/build.gradle ]; then
-            if ! grep -q 'buildConfig' app/build.gradle; then
-              if grep -q 'buildFeatures {' app/build.gradle; then
-                sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
-              else
-                sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
-              fi
-              echo "Added buildConfig = true to app/build.gradle"
+            echo "--- app/build.gradle BEFORE patching ---"
+            cat app/build.gradle
+            echo "----------------------------------------"
+            # Enable buildConfig = true (AGP 8.x disables it by default, but prebuild-generated
+            # Kotlin code references BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
+            if grep -q 'buildConfig = false' app/build.gradle; then
+              sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
+              echo "Replaced buildConfig = false -> true"
+            elif grep -q 'buildConfig = true' app/build.gradle; then
+              echo "buildConfig = true already set"
+            elif grep -q 'buildFeatures {' app/build.gradle; then
+              sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
+              echo "Added buildConfig = true to existing buildFeatures block"
             else
-              echo "buildConfig already present in app/build.gradle"
+              sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
+              echo "Added buildFeatures block with buildConfig = true"
             fi
+            # Ensure namespace is set (required for R class generation in AGP 8.x)
+            if grep -q 'namespace' app/build.gradle; then
+              echo "namespace already set"
+            else
+              sed -i '/android {/a\    namespace "com.droidvibe.app"' app/build.gradle
+              echo "Added namespace to app/build.gradle"
+            fi
+            echo "--- app/build.gradle AFTER patching ---"
+            cat app/build.gradle
+            echo "----------------------------------------"
+          else
+            echo "ERROR: app/build.gradle not found!"
           fi
           echo "=== Final gradle.properties ==="
           cat gradle.properties
@@ -247,6 +287,11 @@ jobs:
           echo "## gradle.properties" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           cat apps/mobile/android/gradle.properties >> /tmp/issue.md 2>/dev/null || echo "File not found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
+          echo "## app/build.gradle (buildConfig + namespace)" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          grep -n 'buildConfig\|namespace\|buildFeatures' apps/mobile/android/app/build.gradle >> /tmp/issue.md 2>/dev/null || echo "Not found" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           echo "" >> /tmp/issue.md
           echo "## build.gradle (ndkVersion)" >> /tmp/issue.md

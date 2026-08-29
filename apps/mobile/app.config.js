@@ -11,15 +11,42 @@
  * is required because AGP 8.x disables BuildConfig generation by default
  * but the generated MainActivity.kt and MainApplication.kt reference it.
  */
-const { withAppBuildGradle, withGradleProperties } = require('expo/config-plugins');
+
+// Load config plugins with fallback for different export paths
+let withAppBuildGradle, withGradleProperties;
+try {
+  const plugins = require('expo/config-plugins');
+  withAppBuildGradle = plugins.withAppBuildGradle;
+  withGradleProperties = plugins.withGradleProperties;
+  console.log('[DroidVibe] Config plugins loaded from expo/config-plugins:', {
+    withAppBuildGradle: typeof withAppBuildGradle,
+    withGradleProperties: typeof withGradleProperties,
+  });
+} catch (e) {
+  console.warn('[DroidVibe] Failed to load config plugins from expo/config-plugins:', e.message);
+  try {
+    const plugins = require('@expo/config-plugins');
+    withAppBuildGradle = plugins.withAppBuildGradle;
+    withGradleProperties = plugins.withGradleProperties;
+    console.log('[DroidVibe] Config plugins loaded from @expo/config-plugins:', {
+      withAppBuildGradle: typeof withAppBuildGradle,
+      withGradleProperties: typeof withGradleProperties,
+    });
+  } catch (e2) {
+    console.warn('[DroidVibe] Failed to load config plugins from @expo/config-plugins:', e2.message);
+    console.warn('[DroidVibe] Config plugins will NOT run — CI fallback patch will handle buildConfig');
+  }
+}
 
 function withKotlinVersion(config) {
+  if (!withGradleProperties) {
+    console.warn('[DroidVibe] withGradleProperties not available — skipping Kotlin version patch');
+    return config;
+  }
   return withGradleProperties(config, (cfg) => {
     const props = cfg.modResults.properties;
 
     // --- Kotlin version: 1.9.24 -> 1.9.25 for Compose Compiler 1.5.15 ---
-    // The Expo SDK 52 build.gradle reads: findProperty('android.kotlinVersion')
-    // So the property name in gradle.properties MUST be 'android.kotlinVersion'
     let foundKotlin = false;
     for (const prop of props) {
       if (prop.key === 'android.kotlinVersion') {
@@ -55,6 +82,7 @@ function withKotlinVersion(config) {
       props.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
     }
 
+    console.log('[DroidVibe] withKotlinVersion plugin applied — gradle.properties patched');
     return cfg;
   });
 }
@@ -69,11 +97,26 @@ function withKotlinVersion(config) {
  * "Unresolved reference: BuildConfig".
  */
 function withBuildConfigEnabled(config) {
+  if (!withAppBuildGradle) {
+    console.warn('[DroidVibe] withAppBuildGradle not available — skipping BuildConfig patch');
+    return config;
+  }
   return withAppBuildGradle(config, (cfg) => {
     const contents = cfg.modResults.contents;
 
     // Skip if already enabled
     if (/buildConfig\s*=\s*true/.test(contents)) {
+      console.log('[DroidVibe] buildConfig = true already present in app/build.gradle');
+      return cfg;
+    }
+
+    // If buildConfig = false, replace with true
+    if (/buildConfig\s*=\s*false/.test(contents)) {
+      cfg.modResults.contents = contents.replace(
+        /buildConfig\s*=\s*false/g,
+        'buildConfig = true'
+      );
+      console.log('[DroidVibe] Replaced buildConfig = false -> true in app/build.gradle');
       return cfg;
     }
 
@@ -83,12 +126,14 @@ function withBuildConfigEnabled(config) {
         /(buildFeatures\s*{)/,
         '$1\n        buildConfig = true'
       );
+      console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
     } else {
       // Otherwise, add a buildFeatures block at the start of the android { } block
       cfg.modResults.contents = contents.replace(
         /(android\s*{)/,
         '$1\n    buildFeatures {\n        buildConfig = true\n    }'
       );
+      console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
     }
 
     return cfg;
