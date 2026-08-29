@@ -2,7 +2,7 @@
 
 > Staged plan toward a production-ready Arduino development workstation.
 
-## Phase 1 — Foundation (complete)
+## Phase 1 â Foundation (complete)
 
 - [x] Monorepo setup (pnpm workspaces + Turborepo)
 - [x] Shared TypeScript core (types, board database, protocol constants)
@@ -11,7 +11,7 @@
 - [x] Diagnostic vocabulary and error-reporting types
 - [x] Unit tests for hex, uf2, boards, protocols
 
-## Phase 2 — Backend (complete)
+## Phase 2 â Backend (complete)
 
 - [x] Hono + oRPC web backend
 - [x] arduino-cli integration (compile, libraries, examples)
@@ -20,7 +20,7 @@
 - [x] Backend deployment (Dockerfile + docker-compose + hosting)
 - [ ] Auth and multi-user support
 
-## Phase 3 — Native USB Module (complete)
+## Phase 3 â Native USB Module (complete)
 
 - [x] Expo native module scaffold (Kotlin, android.hardware.usb)
 - [x] CDC-ACM / CH340 / CP210x / FTDI serial driver
@@ -30,7 +30,7 @@
 - [x] PICOBOOT / UF2 flasher (RP2040)
 - [x] Logic-analyzer capture service (best-effort)
 
-## Phase 4 — Mobile Client (complete)
+## Phase 4 â Mobile Client (complete)
 
 - [x] Expo Router tab navigation (editor, bench, devices, sketches, settings)
 - [x] Code editor with syntax highlighting
@@ -43,15 +43,15 @@
 - [x] Onboarding flow (3-slide intro with AsyncStorage)
 - [x] Offline sketch library (AsyncStorage CRUD)
 
-## Phase 5 — CI/CD & Release (complete)
+## Phase 5 â CI/CD & Release (complete)
 
 - [x] CI pipeline (typecheck, lint, test, web build, prebuild, APK build)
 - [x] Failure-to-issue reporting for build visibility
 - [x] Signed release APK / AAB pipeline (release.yml)
 - [x] GitHub Releases with downloadable APK (release.yml)
-- [x] pnpm-lock.yaml for reproducible installs (.npmrc + CI frozen-lockfile)
+- [ ] pnpm-lock.yaml for reproducible installs (pnpm.overrides lock versions; no lockfile committed yet)
 
-## Phase 6 — Production Hardening (complete)
+## Phase 6 â Production Hardening (complete)
 
 - [x] Error boundaries and crash reporting (ErrorBoundary component)
 - [x] Accessibility audit (TalkBack labels, contrast checks, A11y utilities)
@@ -59,7 +59,7 @@
 - [x] Security review (SECURITY.md with audit results)
 - [x] App store assets (SVG icon/splash sources + generation script)
 
-## Phase 7 — Polish & Launch (in progress)
+## Phase 7 â Polish & Launch (in progress)
 
 - [ ] Generate PNG assets from SVG sources (run scripts/generate-assets.js)
 - [ ] Configure signing secrets for release.yml

@@ -176,6 +176,19 @@ jobs:
           if [ -f build.gradle ]; then
             sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
           fi
+          echo "=== Patching app/build.gradle for BuildConfig (AGP 8.x) ==="
+          if [ -f app/build.gradle ]; then
+            if ! grep -q 'buildConfig' app/build.gradle; then
+              if grep -q 'buildFeatures {' app/build.gradle; then
+                sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
+              else
+                sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
+              fi
+              echo "Added buildConfig = true to app/build.gradle"
+            else
+              echo "buildConfig already present in app/build.gradle"
+            fi
+          fi
           echo "=== Final gradle.properties ==="
           cat gradle.properties
           echo "=== NDK version in build.gradle ==="

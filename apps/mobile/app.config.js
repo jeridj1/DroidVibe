@@ -6,8 +6,12 @@
  * Additionally, SDK 52 + Java 17 can trigger JVM target mismatch errors
  * between compileJavaWithJavac (17) and kspReleaseKotlin (21).
  * This config plugin patches gradle.properties after prebuild to fix both.
+ *
+ * Also enables buildFeatures.buildConfig = true in app/build.gradle, which
+ * is required because AGP 8.x disables BuildConfig generation by default
+ * but the generated MainActivity.kt and MainApplication.kt reference it.
  */
-const { withGradleProperties } = require('expo/config-plugins');
+const { withAppBuildGradle, withGradleProperties } = require('expo/config-plugins');
 
 function withKotlinVersion(config) {
   return withGradleProperties(config, (cfg) => {
@@ -55,6 +59,42 @@ function withKotlinVersion(config) {
   });
 }
 
+/**
+ * Enable buildFeatures.buildConfig = true in app/build.gradle.
+ *
+ * AGP 8.x (used by RN 0.76.x / Expo SDK 52) disables BuildConfig generation
+ * by default. The prebuild-generated MainActivity.kt and MainApplication.kt
+ * reference BuildConfig (e.g., for IS_NEW_ARCHITECTURE_ENABLED), so without
+ * this flag the :app:compileDebugKotlin task fails with
+ * "Unresolved reference: BuildConfig".
+ */
+function withBuildConfigEnabled(config) {
+  return withAppBuildGradle(config, (cfg) => {
+    const contents = cfg.modResults.contents;
+
+    // Skip if already enabled
+    if (/buildConfig\s*=\s*true/.test(contents)) {
+      return cfg;
+    }
+
+    // If a buildFeatures block already exists, add buildConfig = true inside it
+    if (/buildFeatures\s*{/.test(contents)) {
+      cfg.modResults.contents = contents.replace(
+        /(buildFeatures\s*{)/,
+        '$1\n        buildConfig = true'
+      );
+    } else {
+      // Otherwise, add a buildFeatures block at the start of the android { } block
+      cfg.modResults.contents = contents.replace(
+        /(android\s*{)/,
+        '$1\n    buildFeatures {\n        buildConfig = true\n    }'
+      );
+    }
+
+    return cfg;
+  });
+}
+
 module.exports = {
   expo: {
     name: 'DroidVibe',
@@ -74,7 +114,7 @@ module.exports = {
         { name: 'android.hardware.usb.host', required: false },
       ],
     },
-    plugins: [withKotlinVersion],
+    plugins: [withKotlinVersion, withBuildConfigEnabled],
     experiments: {
       tsrPaths: true,
     },
