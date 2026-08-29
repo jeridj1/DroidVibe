@@ -159,7 +159,7 @@ class DroidVibeUsbModule : Module() {
             try {
                 val device = findDevice(deviceId)
                 if (!usbManager.hasPermission(device)) {
-                    promise.reject("USB_NO_PERMISSION", "USB permission not granted")
+                    promise.reject("USB_NO_PERMISSION", "USB permission not granted", null)
                     return@AsyncFunction
                 }
                 val driver = UsbSerialDriver(usbManager, device) { data ->
@@ -170,7 +170,7 @@ class DroidVibeUsbModule : Module() {
                     serialConnections[deviceId] = driver
                     promise.resolve(true)
                 } else {
-                    promise.reject("USB_OPEN_FAILED", "Could not open serial interface")
+                    promise.reject("USB_OPEN_FAILED", "Could not open serial interface", null)
                 }
             } catch (e: Exception) {
                 promise.reject("USB_OPEN_FAILED", e.message ?: "openSerial failed", e)
@@ -180,7 +180,7 @@ class DroidVibeUsbModule : Module() {
         AsyncFunction("writeSerial") { deviceId: String, dataBytes: ByteArray, promise: Promise ->
             try {
                 val driver = serialConnections[deviceId]
-                if (driver == null) { promise.reject("USB_NOT_OPEN", "serial not open"); return@AsyncFunction }
+                if (driver == null) { promise.reject("USB_NOT_OPEN", "serial not open", null); return@AsyncFunction }
                 val n = driver.write(dataBytes)
                 promise.resolve(n)
             } catch (e: Exception) {
@@ -198,7 +198,7 @@ class DroidVibeUsbModule : Module() {
             try {
                 val device = findDevice(request.deviceId)
                 if (!usbManager.hasPermission(device)) {
-                    promise.reject("USB_NO_PERMISSION", "USB permission not granted"); return@AsyncFunction
+                    promise.reject("USB_NO_PERMISSION", "USB permission not granted", null); return@AsyncFunction
                 }
                 val firmware = android.util.Base64.decode(request.firmwareBase64, android.util.Base64.DEFAULT)
                 val result = Uploaders.upload(
@@ -228,7 +228,7 @@ class DroidVibeUsbModule : Module() {
             try {
                 val device = findDevice(deviceId)
                 if (!usbManager.hasPermission(device)) {
-                    promise.reject("USB_NO_PERMISSION", "USB permission not granted"); return@AsyncFunction
+                    promise.reject("USB_NO_PERMISSION", "USB permission not granted", null); return@AsyncFunction
                 }
                 val uf2 = android.util.Base64.decode(uf2Base64, android.util.Base64.DEFAULT)
                 val result = PicobootFlasher.flash(usbManager, device, uf2, verify) { stage, progress, message ->
@@ -267,7 +267,7 @@ class DroidVibeUsbModule : Module() {
 
     private fun findDevice(deviceId: String): UsbDevice {
         return usbManager.deviceList.values.firstOrNull { it.deviceId.toString() == deviceId }
-            ?: throw CodedException("USB_DEVICE_NOT_FOUND", "device not found: $deviceId")
+            ?: throw Exception("device not found: $deviceId")
     }
 
     /** Map a UsbDevice to the shared JS shape. */
@@ -292,7 +292,7 @@ class DroidVibeUsbModule : Module() {
 
     /** Heuristic driver family from interface class + VID. */
     private fun detectDriver(d: UsbDevice): String {
-        // CDC-ACM (class 02 / subclass 02) — Arduino Leonardo/Micro, native USB
+        // CDC-ACM (class 02 / subclass 02) â Arduino Leonardo/Micro, native USB
         for (i in 0 until d.interfaceCount) {
             val iface = d.getInterface(i)
             if (iface.interfaceClass == 2 && iface.interfaceSubclass == 2) return "cdc-acm"

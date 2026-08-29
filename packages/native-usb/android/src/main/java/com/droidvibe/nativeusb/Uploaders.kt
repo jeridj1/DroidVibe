@@ -146,7 +146,7 @@ object Uploaders {
             val cmd = byteArrayOf(STK_READ_PAGE, 0, page.size.toByte(), 'F'.code.toByte(), CRC_EOP)
             driver.write(cmd)
             val got = SyncSerial.read(driver, page.size + 2, 2000)
-            if (!got.copyOfRange(0, min(page.size, got.size)).contentEquals(page)) return false
+            if (!got.copyOfRange(0, minOf(page.size, got.size)).contentEquals(page)) return false
         }
         return true
     }
@@ -200,7 +200,7 @@ object Uploaders {
                 val cmd = ByteArrayOutputStream()
                 cmd.write('B'.code); cmd.write(0); cmd.write(page.size); cmd.write('F'.code); cmd.write(page)
                 driver.write(cmd.toByteArray())
-                Thread.sleep(page.size / 32 + 2)
+                Thread.sleep((page.size / 32 + 2).toLong())
                 done++
             }
             driver.write("L".toByteArray())
