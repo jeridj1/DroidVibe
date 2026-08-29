@@ -216,12 +216,16 @@ jobs:
               sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
               echo "Added buildFeatures block with buildConfig = true"
             fi
-            # Ensure namespace is set (required for R class generation in AGP 8.x)
-            if grep -q 'namespace' app/build.gradle; then
-              echo "namespace already set"
+            # Ensure namespace is set correctly (must match Kotlin file package com.droidvibe.app
+            # for R class + BuildConfig generation in AGP 8.x)
+            if grep -q 'namespace "com.droidvibe.app"' app/build.gradle; then
+              echo "namespace already set correctly to com.droidvibe.app"
+            elif grep -q 'namespace "' app/build.gradle; then
+              sed -i 's/namespace "[^"]*"/namespace "com.droidvibe.app"/' app/build.gradle
+              echo "Fixed namespace to com.droidvibe.app (was wrong value)"
             else
               sed -i '/android {/a\    namespace "com.droidvibe.app"' app/build.gradle
-              echo "Added namespace to app/build.gradle"
+              echo "Added namespace com.droidvibe.app to app/build.gradle"
             fi
             echo "--- app/build.gradle AFTER patching ---"
             cat app/build.gradle

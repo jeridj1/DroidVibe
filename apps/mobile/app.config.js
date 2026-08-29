@@ -98,44 +98,48 @@ function withKotlinVersion(config) {
  */
 function withBuildConfigEnabled(config) {
   if (!withAppBuildGradle) {
-    console.warn('[DroidVibe] withAppBuildGradle not available — skipping BuildConfig patch');
+    console.warn('[DroidVibe] withAppBuildGradle not available — skipping BuildConfig + namespace patch');
     return config;
   }
   return withAppBuildGradle(config, (cfg) => {
-    const contents = cfg.modResults.contents;
+    let contents = cfg.modResults.contents;
+    let modified = false;
 
-    // Skip if already enabled
-    if (/buildConfig\s*=\s*true/.test(contents)) {
-      console.log('[DroidVibe] buildConfig = true already present in app/build.gradle');
-      return cfg;
+    // Fix namespace (must match Kotlin file package com.droidvibe.app for R class + BuildConfig generation)
+    if (!/namespace\s+"com\.droidvibe\.app"/.test(contents)) {
+      if (/namespace\s+"[^"]*"/.test(contents)) {
+        contents = contents.replace(/namespace\s+"[^"]*"/, 'namespace "com.droidvibe.app"');
+        console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
+        modified = true;
+      } else if (/android\s*{/.test(contents)) {
+        contents = contents.replace(/(android\s*{)/, '$1\n    namespace "com.droidvibe.app"');
+        console.log('[DroidVibe] Added namespace com.droidvibe.app to app/build.gradle');
+        modified = true;
+      }
     }
 
-    // If buildConfig = false, replace with true
-    if (/buildConfig\s*=\s*false/.test(contents)) {
-      cfg.modResults.contents = contents.replace(
-        /buildConfig\s*=\s*false/g,
-        'buildConfig = true'
-      );
-      console.log('[DroidVibe] Replaced buildConfig = false -> true in app/build.gradle');
-      return cfg;
-    }
-
-    // If a buildFeatures block already exists, add buildConfig = true inside it
-    if (/buildFeatures\s*{/.test(contents)) {
-      cfg.modResults.contents = contents.replace(
-        /(buildFeatures\s*{)/,
-        '$1\n        buildConfig = true'
-      );
-      console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
+    // Enable buildConfig = true (AGP 8.x disables it by default)
+    if (!/buildConfig\s*=\s*true/.test(contents)) {
+      if (/buildConfig\s*=\s*false/.test(contents)) {
+        contents = contents.replace(/buildConfig\s*=\s*false/g, 'buildConfig = true');
+        console.log('[DroidVibe] Replaced buildConfig = false -> true in app/build.gradle');
+        modified = true;
+      } else if (/buildFeatures\s*{/.test(contents)) {
+        contents = contents.replace(/(buildFeatures\s*{)/, '$1\n        buildConfig = true');
+        console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
+        modified = true;
+      } else if (/android\s*{/.test(contents)) {
+        contents = contents.replace(/(android\s*{)/, '$1\n    buildFeatures {\n        buildConfig = true\n    }');
+        console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
+        modified = true;
+      }
     } else {
-      // Otherwise, add a buildFeatures block at the start of the android { } block
-      cfg.modResults.contents = contents.replace(
-        /(android\s*{)/,
-        '$1\n    buildFeatures {\n        buildConfig = true\n    }'
-      );
-      console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
+      console.log('[DroidVibe] buildConfig = true already present in app/build.gradle');
     }
 
+    if (modified) {
+      cfg.modResults.contents = contents;
+    }
     return cfg;
   });
 }
