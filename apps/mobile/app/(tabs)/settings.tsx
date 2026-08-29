@@ -1,14 +1,29 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
-import { Card, Badge, Row, SectionTitle } from '@/src/components/ui';
+import { Card, Badge, Row, SectionTitle, Button } from '@/src/components/ui';
 
 export default function SettingsScreen() {
   const { palette, mode, setMode, textScale, setTextScale, twoPane, setTwoPane } = useTheme();
   const insets = useSafeAreaInsets();
 
   const themeOptions: ThemeMode[] = ['light', 'dark', 'system'];
+
+  function resetOnboarding() {
+    Alert.alert(
+      'Reset onboarding',
+      'Show the intro tutorial again on next launch?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          onPress: () => AsyncStorage.removeItem('@droidvibe/onboarding_seen'),
+        },
+      ]
+    );
+  }
 
   return (
     <ScrollView
@@ -65,6 +80,19 @@ export default function SettingsScreen() {
         </Row>
       </Card>
 
+      <SectionTitle title="Help" subtitle="Onboarding and support" />
+      <Card style={{ marginBottom: 12 }}>
+        <Pressable onPress={resetOnboarding}>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <View>
+              <Text style={{ color: palette.text, fontWeight: '600' }}>Reset onboarding</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12 }}>Show the intro tutorial again</Text>
+            </View>
+            <Badge label="tap" tone="accent" />
+          </Row>
+        </Pressable>
+      </Card>
+
       <SectionTitle title="About" />
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
@@ -74,6 +102,10 @@ export default function SettingsScreen() {
         <Row style={{ justifyContent: 'space-between', marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>Stack</Text>
           <Text style={{ color: palette.text }}>Expo · Hono · Turso</Text>
+        </Row>
+        <Row style={{ justifyContent: 'space-between', marginTop: 8 }}>
+          <Text style={{ color: palette.textMuted }}>USB protocols</Text>
+          <Text style={{ color: palette.text }}>STK500 · AVR109 · ESP · PICOBOOT</Text>
         </Row>
       </Card>
 
