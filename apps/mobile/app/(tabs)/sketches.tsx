@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Button, Row, SectionTitle } from '@/src/components/ui';
 import { api } from '@/src/lib/api';
 import { setPendingSketch } from '@/src/lib/sketchBridge';
+import { getLocalSketches, saveLocalSketch, deleteLocalSketch, type LocalSketch } from '@/src/lib/offlineSketches';
 
 interface SketchItem { id: string; name: string; fqbn: string; port: string | null; updatedAt: number; }
 
@@ -86,6 +87,7 @@ export default function SketchesScreen() {
   const [cloud, setCloud] = useState<SketchItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
+  const [localSketches, setLocalSketches] = useState<LocalSketch[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -95,6 +97,11 @@ export default function SketchesScreen() {
       .catch(() => active && setOffline(true))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
+  }, []);
+
+  // Load local sketches
+  useEffect(() => {
+    getLocalSketches().then(setLocalSketches);
   }, []);
 
   function openExample(id: string, name: string) {
@@ -108,13 +115,36 @@ export default function SketchesScreen() {
     router.push('/editor');
   }
 
+  async function openLocalSketch(sketch: LocalSketch) {
+    setPendingSketch(sketch.code, sketch.name);
+    router.push('/editor');
+  }
+
+  async function deleteSketch(id: string) {
+    Alert.alert(
+      'Delete sketch',
+      'This will permanently delete the local sketch. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteLocalSketch(id);
+            setLocalSketches(await getLocalSketches());
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: palette.text }]}>Sketches</Text>
           <Text style={{ color: palette.textMuted, fontSize: 13 }}>
-            Cloud projects · examples · templates
+            Cloud projects · local · examples
           </Text>
         </View>
         <Button title="New" onPress={newSketch} />
@@ -140,6 +170,27 @@ export default function SketchesScreen() {
                 </Pressable>
               )}
             />
+
+            {localSketches.length > 0 && (
+              <>
+                <View style={{ height: 16 }} />
+                <SectionTitle title="Local sketches" subtitle="Stored on device — works offline" />
+              </>
+            )}
+
+            {localSketches.map((sketch) => (
+              <Card key={sketch.id} style={{ marginBottom: 10 }}>
+                <Pressable onPress={() => openLocalSketch(sketch)} onLongPress={() => deleteSketch(sketch.id)}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{sketch.name}</Text>
+                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn}</Text>
+                    </View>
+                    <Badge label="local" tone="neutral" />
+                  </Row>
+                </Pressable>
+              </Card>
+            ))}
 
             <View style={{ height: 16 }} />
             <SectionTitle title="Cloud sketches" subtitle={offline ? 'Backend offline — showing local only' : undefined} />
