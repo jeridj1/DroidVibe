@@ -1,11 +1,16 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewStyle, AccessibilityRole, AccessibilityState } from 'react-native';
 import { useTheme } from '@/src/theme/ThemeProvider';
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Card({ children, style, accessibilityLabel }: { children: React.ReactNode; style?: ViewStyle; accessibilityLabel?: string }) {
   const { palette } = useTheme();
   return (
-    <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }, style]}>
+    <View
+      style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }, style]}
+      accessible={!!accessibilityLabel}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={AccessibilityRole.Summary}
+    >
       {children}
     </View>
   );
@@ -20,11 +25,15 @@ export function Button({
   onPress,
   variant = 'primary',
   disabled,
+  accessibilityHint,
+  testID,
 }: {
   title: string;
   onPress?: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
+  accessibilityHint?: string;
+  testID?: string;
 }) {
   const { palette } = useTheme();
   const bg =
@@ -38,12 +47,19 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      testID={testID}
+      accessibilityRole={AccessibilityRole.Button}
+      accessibilityLabel={title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={disabled ? { disabled: true } : undefined}
       style={({ pressed }) => [
         styles.btn,
         { backgroundColor: bg, borderColor: variant === 'ghost' ? palette.surfaceBorder : 'transparent', opacity: pressed || disabled ? 0.6 : 1 },
       ]}
     >
-      <Text style={{ color, fontWeight: '700', fontSize: 14 }}>{title}</Text>
+      <Text style={{ color, fontWeight: '700', fontSize: 14 }} allowFontScaling>
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -58,8 +74,13 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
     accent: { bg: palette.accent + '22', fg: palette.accent },
   }[tone];
   return (
-    <View style={[styles.badge, { backgroundColor: map.bg }]}>
-      <Text style={{ color: map.fg, fontSize: 11, fontWeight: '700' }}>{label}</Text>
+    <View
+      style={[styles.badge, { backgroundColor: map.bg }]}
+      accessible
+      accessibilityLabel={label}
+      accessibilityRole={AccessibilityRole.Text}
+    >
+      <Text style={{ color: map.fg, fontSize: 11, fontWeight: '700' }} allowFontScaling>{label}</Text>
     </View>
   );
 }
@@ -67,9 +88,14 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
 export function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const { palette } = useTheme();
   return (
-    <View style={styles.section}>
-      <Text style={{ color: palette.text, fontSize: 17, fontWeight: '800' }}>{title}</Text>
-      {subtitle ? <Text style={{ color: palette.textMuted, fontSize: 12 }}>{subtitle}</Text> : null}
+    <View
+      style={styles.section}
+      accessible
+      accessibilityLabel={subtitle ? `${title}: ${subtitle}` : title}
+      accessibilityRole={AccessibilityRole.Header}
+    >
+      <Text style={{ color: palette.text, fontSize: 17, fontWeight: '800' }} allowFontScaling>{title}</Text>
+      {subtitle ? <Text style={{ color: palette.textMuted, fontSize: 12 }} allowFontScaling>{subtitle}</Text> : null}
     </View>
   );
 }
