@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '@/src/theme/ThemeProvider';
+import { ErrorBoundary } from '@/src/components/ErrorBoundary';
 
 function ThemedStack() {
   const { resolved, palette } = useTheme();
@@ -18,6 +19,10 @@ function ThemedStack() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="onboarding"
+          options={{ presentation: 'fullScreenModal', headerShown: false }}
+        />
       </Stack>
     </>
   );
@@ -25,12 +30,14 @@ function ThemedStack() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <ThemedStack />
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <ThemedStack />
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
