@@ -7,6 +7,12 @@
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A1518"
+    },
     "android": {
       "package": "com.droidvibe.app",
       "minSdkVersion": 24,
@@ -15,7 +21,11 @@
       "permissions": ["android.hardware.usb.host"],
       "features": [
         { "name": "android.hardware.usb.host", "required": false }
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00979D"
+      }
     },
     "plugins": [],
     "experiments": {
