@@ -17,7 +17,7 @@
 - [x] arduino-cli integration (compile, libraries, examples)
 - [x] Drizzle ORM + Turso schema (sketches, builds, devices)
 - [x] AI assist route (generate, fix, explain)
-- [ ] Backend deployment (Dockerfile + hosting)
+- [x] Backend deployment (Dockerfile + docker-compose)
 - [ ] Auth and multi-user support
 
 ## Phase 3 — Native USB Module (complete)
@@ -39,22 +39,27 @@
 - [x] Waveform viewer (zoom, cursors, protocol decode lanes)
 - [x] Theme system (dark/light/system) with AsyncStorage persistence
 - [x] AI generate/fix/explain features
-- [ ] S Pen / tablet / DeX-aware layouts
-- [ ] Onboarding flow
-- [ ] Offline sketch library
+- [x] Onboarding flow (first-run intro with AsyncStorage persistence)
+- [x] Offline sketch library (AsyncStorage local sketch persistence)
+- [ ] S Pen / tablet / DeX-aware layouts (two-pane setting exists)
+- [ ] Cloud sketch sync integration
 
 ## Phase 5 — CI/CD & Release
 
 - [x] CI pipeline (typecheck, lint, test, web build, prebuild, APK build)
 - [x] Failure-to-issue reporting for build visibility
-- [ ] Signed release APK / AAB pipeline
-- [ ] GitHub Releases with downloadable APK
+- [x] Signed release APK pipeline (release.yml workflow)
+- [x] GitHub Releases with downloadable APK
 - [ ] pnpm-lock.yaml for reproducible installs
+- [ ] Configure signing secrets (ANDROID_SIGNING_KEY, etc.)
 
-## Phase 6 — Production Hardening
+## Phase 6 — Production Hardening (in progress)
 
-- [ ] Error boundaries and crash reporting
+- [x] Error boundaries and crash recovery
+- [x] App store assets config (icon, splash, adaptive icon)
+- [x] Comprehensive README
 - [ ] Accessibility audit (TalkBack, large text, contrast)
 - [ ] Performance profiling and optimization
 - [ ] Security review (see SECURITY.md)
-- [ ] App store assets (icons, splash, store listing)
+- [ ] App store listing assets (screenshots, description)
+- [ ] Generate actual icon and splash images
