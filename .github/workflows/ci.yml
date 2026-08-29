@@ -134,7 +134,7 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
       - run: pnpm install --no-frozen-lockfile
       - name: SDK licenses
-        run: yes |${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+        run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install SDK components
         run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
       - name: Expo prebuild
@@ -172,7 +172,7 @@ jobs:
           if ! grep -q 'org.gradle.caching' gradle.properties; then
             echo "org.gradle.caching=true" >> gradle.properties
           fi
-          echo "=== Patching build.gradle NDK version ==="
+          echo "=== Patching build.gradle NDK Version ==="
           if [ -f build.gradle ]; then
             sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
           fi
@@ -181,7 +181,7 @@ jobs:
           echo "=== NDK version in build.gradle ==="
           grep ndkVersion build.gradle || echo "ndkVersion not found in build.gradle"
           echo "=== NDK versions installed ==="
-          ls ${ANDROID_HOME}/ndk/ 2>/dev/null || echo "No NDK found in ${ANDROID_HOME}/ndk/"
+          ls ${ANDROID_HOME}/ndk/ 2>/dev/null || echo "No NDK found"
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
@@ -221,6 +221,16 @@ jobs:
           echo "Commit: ${{ github.sha }}" >> /tmp/issue.md
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue.md
           echo "" >> /tmp/issue.md
+          echo "## Kotlin Compiler Errors" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          grep -E "^e: " apps/mobile/android/gradle-build.log | head -80 >> /tmp/issue.md 2>/dev/null || echo "No e: lines found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
+          echo "## What went wrong" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          grep -E "What went wrong|FAILURE:|error:" apps/mobile/android/gradle-build.log -A 10 | head -100 >> /tmp/issue.md 2>/dev/null || echo "No error lines found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
           echo "## gradle.properties" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           cat apps/mobile/android/gradle.properties >> /tmp/issue.md 2>/dev/null || echo "File not found" >> /tmp/issue.md
@@ -236,8 +246,8 @@ jobs:
           ls ${ANDROID_HOME}/ndk/ 2>/dev/null || echo "No NDK found" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           echo "" >> /tmp/issue.md
-          echo "## Gradle Build Log (last 150 lines)" >> /tmp/issue.md
+          echo "## Gradle Build Log (last 300 lines)" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
-          tail -150 apps/mobile/android/gradle-build.log >> /tmp/issue.md 2>/dev/null || echo "No build log found" >> /tmp/issue.md
+          tail -300 apps/mobile/android/gradle-build.log >> /tmp/issue.md 2>/dev/null || echo "No build log found" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           gh issue create --title "CI: APK build failed" --body-file /tmp/issue.md || true
