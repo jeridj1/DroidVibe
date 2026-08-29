@@ -4,7 +4,9 @@
   "private": true,
   "description": "DroidVibe — a flagship Android development workstation for Arduino-class hardware.",
   "packageManager": "pnpm@9.12.0",
-  "engines": { "node": ">=20.0.0" },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -21,5 +23,12 @@
     "turbo": "^2.3.3",
     "typescript": "^5.6.3",
     "prettier": "^3.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "expo": "52.0.49",
+      "expo-modules-core": "2.2.3",
+      "react-native": "0.76.9"
+    }
   }
 }
