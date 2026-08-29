@@ -6,8 +6,8 @@ import java.io.ByteArrayOutputStream
  * ESP ROM-loader (esptool-compatible) SLIP command builders.
  */
 object EspRom {
-    private const val SLIP_END: Byte = 0xC0
-    private const val SLIP_ESC: Byte = 0xDB
+    private const val SLIP_END: Int = 0xC0
+    private const val SLIP_ESC: Int = 0xDB
 
     private fun le32(v: Int): ByteArray =
         byteArrayOf(v.toByte(), (v shr 8).toByte(), (v shr 16).toByte(), (v shr 24).toByte())
@@ -30,7 +30,7 @@ object EspRom {
         header.write(le32(data.size))
         header.write(le32(checksum))
         val body = ByteArrayOutputStream(); body.write(header.toByteArray()); body.write(data)
-        val framed = ByteArrayOutputStream(); framed.write(SLIP_END.toInt()); framed.write(slipEncode(body.toByteArray())); framed.write(SLIP_END.toInt())
+        val framed = ByteArrayOutputStream(); framed.write(SLIP_END); framed.write(slipEncode(body.toByteArray())); framed.write(SLIP_END)
         return framed.toByteArray()
     }
 
