@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle, AccessibilityRole, AccessibilityState } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewStyle, type AccessibilityState, AccessibilityRole } from 'react-native';
 import { useTheme } from '@/src/theme/ThemeProvider';
 
 export function Card({ children, style, accessibilityLabel }: { children: React.ReactNode; style?: ViewStyle; accessibilityLabel?: string }) {
@@ -51,7 +51,7 @@ export function Button({
       accessibilityRole={AccessibilityRole.Button}
       accessibilityLabel={title}
       accessibilityHint={accessibilityHint}
-      accessibilityState={disabled ? { disabled: true } : undefined}
+      accessibilityState={disabled ? { disabled: true } as AccessibilityState : undefined}
       style={({ pressed }) => [
         styles.btn,
         { backgroundColor: bg, borderColor: variant === 'ghost' ? palette.surfaceBorder : 'transparent', opacity: pressed || disabled ? 0.6 : 1 },
