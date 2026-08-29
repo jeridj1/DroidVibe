@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 /**
  * Performance optimization utilities for DroidVibe mobile app.
@@ -52,9 +52,6 @@ export function useDebouncedValue<T>(initial: T, delay: number = 300): [T, (v: T
 
   return [value, setValue, pending];
 }
-
-// Import useState lazily to avoid circular dependency issues
-import { useState } from 'react';
 
 /**
  * Returns a memoized getItemLayout for fixed-height FlatList items.
