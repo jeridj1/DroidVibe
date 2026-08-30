@@ -143,7 +143,7 @@ export default function EditorScreen() {
     buildStageRef.current = buildStage;
   }, [buildStage]);
 
-  // Track code changes for undo history (debounced — only snapshots meaningful edits)
+  // Track code changes for undo history (debounced â only snapshots meaningful edits)
   useEffect(() => {
     if (code === lastCodeRef.current) return;
     const timer = setTimeout((
@@ -212,7 +212,7 @@ export default function EditorScreen() {
     });
   }, []);
 
-  // USB disconnect detection — abort in-progress upload
+  // USB disconnect detection â abort in-progress upload
   useEffect(() => {
     if (!nativeUsb) return;
     const unsub = addDeviceListener((e) => {
@@ -295,7 +295,7 @@ SB unavailable. Build a DroidVibe dev/production APK to access USB hardware.');
     }
     if (!fw) return;
 
-    // Open device picker — filter to only permission-granted devices
+    // Open device picker â filter to only permission-granted devices
     const devs = await listDevices();
     const granted = devs.filter((d) => d.permission === 'granted');
     setDevices(granted);
@@ -348,7 +348,7 @@ age));
     uploadDeviceRef.current = device;
     uploadAbortedRef.current = false;
 
-    // Board identification — explicit confirmed state
+    // Board identification â explicit confirmed state
     const id = identifyBoard(device.vendorId, device.productId);
     setIdentifiedBoard(id);
 
@@ -525,12 +525,12 @@ age));
       {!nativeUsb && (
         <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
           <Text style={{ color: palette.warning, fontSize: 12, fontWeight: '600' }}>
-            Expo Go detected — native USB unavailable. Build a dev/production APK for hardware access.
+            Expo Go detected â native USB unavailable. Build a dev/production APK for hardware access.
           </Text>
         </View>
       )}
 
-      {/* Identified board state — explicit confirmed state */}
+      {/* Identified board state â explicit confirmed state */}
       {identifiedBoard && (
         <View style={[styles.boardIdBar, { backgroundColor: palette.accent + '12', borderColor: palette.accent + '40' }]}>
           <HardwareStatusBadge state="connected" />
@@ -539,7 +539,7 @@ age));
               Board identified: {identifiedBoard.name}
             </Text>
             <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-              {identifiedBoard.protocol} — {identifiedBoard.fqbn}
+              {identifiedBoard.protocol} â {identifiedBoard.fqbn}
             </Text>
           </View>
         </View>
@@ -725,7 +725,7 @@ age));
                           {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
                         <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
-                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
+                          {item.manufacturer ?? 'â'} Â· VID {item.vendorId} PID {item.productId}
                         </Text>
                       </View>
                       {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
