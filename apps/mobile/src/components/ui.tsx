@@ -73,7 +73,7 @@ export function Row({
         styles.row,
         align ? { alignItems: align } : null,
         justify ? { justifyContent: justify } : null,
-        gap != null ? { gap } : null,
+        gap != null ? ({ gap } as ViewStyle) : null,
         style,
       ]}
     >

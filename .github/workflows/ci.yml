@@ -41,19 +41,25 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             cat /tmp/tsc-output.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            # Create issue with full output for debugging
             {
               echo "## Full Typecheck Output"
               echo ""
               echo "Commit: ${{ github.sha }}"
               echo ""
               echo '```'
-              cat /tmp/tsc-output.txt
+              cat /tmp/tsc-ouput.txt
               echo '```'
             } > /tmp/tc-issue.md
             gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
             exit 1
           fi
+      - name: Upload typecheck output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsc-output
+          path: /tmp/tsc-output.txt
+          if-no-files-found: ignore
       - run: pnpm lint
 
   web-build:
@@ -95,8 +101,7 @@ jobs:
 
   mobile-prebuild:
     name: Expo Prebuild Validation
-    ru
-ns-on: ubuntu-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: quality
     env:
@@ -113,7 +118,7 @@ ns-on: ubuntu-latest
       - name: Expo prebuild
         working-directory: apps/mobile
         run: |
-          pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild.log
+          pnpm exec expo prebuild -platform android --no-install --clean 2>&1 | tee prebuild.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -157,16 +162,15 @@ ns-on: ubuntu-latest
             apps/mobile/android/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
-    
-  - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: SDK licenses
         run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install SDK components
-        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools35.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
       - name: Expo prebuild
         working-directory: apps/mobile
         run: |
-          pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee prebuild-apk.log
+          pnpm exec expo prebuild -platform android --no-install --clean 2>&1 | tee prebuild-apk.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -178,7 +182,7 @@ ns-on: ubuntu-latest
         run: |
           echo "=== Checking if config plugins ran ==="
           echo "--- prebuild-apk.log (plugin-related lines) ---"
-          grep -i "plugin\|config\|buildConfig\|withApp\|withGradle\|error\|warn" prebuild-apk.log | head -30 || echo "No matching lines found"
+          grep -i "plugin\|config|buildConfig|withApp\|withGradle||error\|warn" prebuild-ppk.log | head -30 || echo "No matching lines found"
           echo "--- gradle.properties (checking for -Xmx3g from plugin) ---"
           grep 'org.gradle.jvmargs' android/gradle.properties 2>/dev/null || echo "gradle.properties not found"
           echo "--- app/build.gradle (buildConfig) ---"
@@ -193,8 +197,7 @@ ns-on: ubuntu-latest
           if [ -f gradle.properties ]; then
             if grep -q 'android.kotlinVersion=' gradle.properties; then
               sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties
-    
-        else
+            else
               echo "android.kotlinVersion=1.9.25" >> gradle.properties
             fi
           else
@@ -203,13 +206,11 @@ ns-on: ubuntu-latest
           if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
             echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
           fi
-          # Fix jvmargs: replace existing value instead of appending
           if grep -q '^org.gradle.jvmargs' gradle.properties; then
             sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx3g/' gradle.properties
           else
             echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
           fi
-          # Fix parallel: use ^ anchor to avoid matching commented lines
           if grep -q '^org.gradle.parallel' gradle.properties; then
             sed -i 's/^org.gradle.parallel=.*/org.gradle.parallel=true/' gradle.properties
           else
@@ -229,11 +230,8 @@ ns-on: ubuntu-latest
             echo "--- app/build.gradle BEFORE patching ---"
             cat app/build.gradle
             echo "----------------------------------------"
-            # Enable buildConfig = true (AGP 8.x disables it by default, but prebuild-generated
-            # Kotlin code references BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
             if grep -q 'buildConfig = false' app/build.gradle; then
-             
- sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
+              sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
               echo "Replaced buildConfig = false -> true"
             elif grep -q 'buildConfig = true' app/build.gradle; then
               echo "buildConfig = true already set"
@@ -244,8 +242,6 @@ ns-on: ubuntu-latest
               sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
               echo "Added buildFeatures block with buildConfig = true"
             fi
-            # Ensure namespace is set correctly (must match Kotlin file package com.droidvibe.app
-            # for R class + BuildConfig generation in AGP 8.x)
             if grep -q 'namespace "com.droidvibe.app"' app/build.gradle; then
               echo "namespace already set correctly to com.droidvibe.app"
             elif grep -q 'namespace "' app/build.gradle; then
@@ -267,8 +263,7 @@ ns-on: ubuntu-latest
           grep ndkVersion build.gradle || echo "ndkVersion not found in build.gradle"
           echo "=== NDK versions installed ==="
           ls ${ANDROID_HOME}/ndk/ 2>/dev/null || echo "No NDK found"
-   
-   - name: Build debug APK
+      - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set -o pipefail
@@ -312,7 +307,6 @@ ns-on: ubuntu-latest
           grep -E "^e: " apps/mobile/android/gradle-build.log | head -80 >> /tmp/issue.md 2>/dev/null || echo "No e: lines found" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           echo "" >> /tmp/issue.md
-
           echo "## What went wrong" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           grep -E "What went wrong|FAILURE:|error:" apps/mobile/android/gradle-build.log -A 10 | head -100 >> /tmp/issue.md 2>/dev/null || echo "No error lines found" >> /tmp/issue.md
