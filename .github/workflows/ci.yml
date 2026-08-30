@@ -38,7 +38,6 @@ jobs:
             echo "## TypeScript Errors" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             grep ': error TS' /tmp/tsc-output.txt >> $GITHUB_STEP_SUMMARY || true
-            grep ': error TS' /tmp/tsc-output.txt | sed 's/^@[^:]*:[^:]*: //' | sed -nE 's|^(.+)\(([0-9]+),([0-9]+)\): (error TS[0-9]+): (.*)$|::error file=apps/mobile/\1,line=\2,col=\3::\4: \5|p'
             echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
