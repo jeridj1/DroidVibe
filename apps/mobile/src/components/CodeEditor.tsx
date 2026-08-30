@@ -8,7 +8,7 @@ interface Props {
   value: string;
   onChange: (v: string) => void;
   diagnostics?: Diagnostic[];
-  /** When provided, scrolls the editor to this line */
+  /** When provided, scrolls the editor to this line and moves the cursor */
   scrollToLine?: number;
 }
 
@@ -16,18 +16,21 @@ interface Props {
  * Code editor with line-number gutter, error gutter, and syntax highlighting
  * via a transparent-TextInput-over-colored-overlay technique.
  *
- * Key improvements over original:
+ * Key improvements:
  * - Scroll synchronization between overlay and TextInput
  * - textScale from theme applied to font size
  * - Auto-indent on Enter (matches previous line indentation)
  * - Cursor position tracking via onSelectionChange
- * - Virtualized gutter for large sketches
+ * - scrollToLine support: moves cursor + selection to target line
  */
 export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: Props) {
   const { palette, textScale } = useTheme();
   const lines = useMemo(() => value.split('\n'), [value]);
   const lineCount = lines.length;
-  const errorLines = useMemo(() => new Set(diagnostics.filter((d) => d.severity === 'error').map((d) => d.line)), [diagnostics]);
+  const errorLines = useMemo(
+    () => new Set(diagnostics.filter((d) => d.severity === 'error').map((d) => d.line)),
+    [diagnostics],
+  );
 
   const FONT = Math.round(14 * textScale);
   const LINE = Math.round(20 * textScale);
@@ -37,6 +40,9 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [cursorLine, setCursorLine] = useState(1);
+  const [selectionOverride, setSelectionOverride] = useState<
+    { start: number; end: number } | undefined
+  >(undefined);
 
   // Sync overlay scroll when TextInput scrolls
   const handleScroll = useCallback((e: any) => {
@@ -47,27 +53,44 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
   }, []);
 
   // Track cursor position
-  const handleSelectionChange = useCallback((e: any) => {
-    const { start } = e.nativeEvent.selection;
-    const textBeforeCursor = value.substring(0, start);
-    const lineNum = textBeforeCursor.split('\n').length;
-    setCursorLine(lineNum);
-  }, [value]);
+  const handleSelectionChange = useCallback(
+    (e: any) => {
+      if (selectionOverride) return; // Ignore when we are programmatically setting selection
+      const { start } = e.nativeEvent.selection;
+      const textBeforeCursor = value.substring(0, start);
+      const lineNum = textBeforeCursor.split('\n').length;
+      setCursorLine(lineNum);
+    },
+    [value, selectionOverride],
+  );
 
   // Auto-indent: when user presses Enter, match previous line indentation
-  const handleChange = useCallback((newText: string) => {
-    onChange(newText);
-  }, [onChange]);
+  const handleChange = useCallback(
+    (newText: string) => {
+      // Clear any programmatic selection override when user starts editing
+      if (selectionOverride) setSelectionOverride(undefined);
+      onChange(newText);
+    },
+    [onChange, selectionOverride],
+  );
 
-  // Scroll to line when scrollToLine changes
+  // Scroll to line when scrollToLine changes — sets cursor position which
+  // causes the TextInput to scroll to make the cursor visible
   React.useEffect(() => {
     if (scrollToLine && scrollToLine > 0) {
-      const y = (scrollToLine - 1) * LINE;
-      inputRef.current?.setNativeProps({ selection: { start: 0, end: 0 } });
-      // Note: RN TextInput doesn't support scrollTo directly; this would need
-      // a ref to the underlying ScrollView. For now, we highlight the line.
+      const linesArr = value.split('\n');
+      let offset = 0;
+      const targetLine = Math.min(scrollToLine - 1, linesArr.length - 1);
+      for (let i = 0; i < targetLine; i++) {
+        offset += linesArr[i].length + 1; // +1 for newline
+      }
+      setSelectionOverride({ start: offset, end: offset });
+      setCursorLine(scrollToLine);
+      // Clear the override after a short delay so user can edit normally
+      const timer = setTimeout(() => setSelectionOverride(undefined), 600);
+      return () => clearTimeout(timer);
     }
-  }, [scrollToLine, LINE]);
+  }, [scrollToLine]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View style={[styles.container, { backgroundColor: palette.monoBg, borderColor: palette.surfaceBorder }]}>
@@ -82,10 +105,24 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
           >
             {Array.from({ length: Math.max(lineCount, 1) }).map((_, i) => (
               <View key={i} style={[styles.gutterRow, { height: LINE }]}>
-                <Text style={[styles.gutterText, { color: errorLines.has(i + 1) ? palette.danger : i + 1 === cursorLine ? palette.accent : palette.textMuted, fontSize: Math.max(10, FONT - 2) }]}>
+                <Text
+                  style={[
+                    styles.gutterText,
+                    {
+                      color: errorLines.has(i + 1)
+                        ? palette.danger
+                        : i + 1 === cursorLine
+                          ? palette.accent
+                          : palette.textMuted,
+                      fontSize: Math.max(10, FONT - 2),
+                    },
+                  ]}
+                >
                   {String(i + 1).padStart(3, ' ')}
                 </Text>
-                {errorLines.has(i + 1) && <Text style={{ color: palette.danger, fontSize: 9 }}>{'\u25CF'}</Text>}
+                {errorLines.has(i + 1) && (
+                  <Text style={{ color: palette.danger, fontSize: 9 }}>{'\u25CF'}</Text>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -102,7 +139,11 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
               scrollEnabled={false}
               contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 6 }}
             >
-              <HighlightedText code={value + (value.endsWith('\n') ? ' ' : '')} fontSize={FONT} lineHeight={LINE} />
+              <HighlightedText
+                code={value + (value.endsWith('\n') ? ' ' : '')}
+                fontSize={FONT}
+                lineHeight={LINE}
+              />
             </ScrollView>
           </View>
           {/* transparent TextInput on top */}
@@ -117,12 +158,10 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
             spellCheck={false}
             selectTextOnFocus={false}
             cursorColor={palette.accent}
+            selection={selectionOverride}
             onScroll={handleScroll}
             onSelectionChange={handleSelectionChange}
-            style={[
-              styles.input,
-              { color: 'transparent', fontSize: FONT, lineHeight: LINE },
-            ]}
+            style={[styles.input, { color: 'transparent', fontSize: FONT, lineHeight: LINE }]}
             placeholderTextColor={palette.textMuted}
           />
         </View>
@@ -138,8 +177,16 @@ const styles = StyleSheet.create({
   gutterText: { fontFamily: 'monospace', paddingHorizontal: 4 },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   input: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    fontFamily: 'monospace', paddingHorizontal: 8, paddingVertical: 6, textAlignVertical: 'top',
-    backgroundColor: 'transparent', minHeight: 200,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    fontFamily: 'monospace',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    textAlignVertical: 'top',
+    backgroundColor: 'transparent',
+    minHeight: 200,
   },
 });
