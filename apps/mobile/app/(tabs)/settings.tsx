@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Row, SectionTitle, Button, Switch, Divider } from '@/src/components/ui';
+import { isNativeUsbAvailable } from '@/src/lib/transport';
 import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
