@@ -16,6 +16,7 @@ import {
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '@/src/theme/ThemeProvider';
 
 const ONBOARDING_KEY = '@droidvibe/onboarding_seen';
 const { width } = Dimensions.get('window');
@@ -39,11 +40,11 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen() {
+  const { palette } = useTheme();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // If already seen, skip immediately
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY).then((seen) => {
       if (seen === 'true') {
@@ -71,11 +72,11 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.skipRow}>
         {activeIndex < SLIDES.length - 1 && (
           <Pressable onPress={finish}>
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={[styles.skipText, { color: palette.textMuted }]}>Skip</Text>
           </Pressable>
         )}
       </View>
@@ -92,8 +93,8 @@ export default function OnboardingScreen() {
         {SLIDES.map((slide, i) => (
           <View key={i} style={[styles.slide, { width }]}>
             <Text style={styles.icon}>{slide.icon}</Text>
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.body}>{slide.body}</Text>
+            <Text style={[styles.title, { color: palette.text }]}>{slide.title}</Text>
+            <Text style={[styles.body, { color: palette.textMuted }]}>{slide.body}</Text>
           </View>
         ))}
       </ScrollView>
@@ -103,12 +104,12 @@ export default function OnboardingScreen() {
           {SLIDES.map((_, i) => (
             <View
               key={i}
-              style={[styles.dot, { opacity: i === activeIndex ? 1 : 0.3 }]}
+              style={[styles.dot, { backgroundColor: palette.accent, opacity: i === activeIndex ? 1 : 0.3 }]}
             />
           ))}
         </View>
-        <Pressable style={styles.button} onPress={next}>
-          <Text style={styles.buttonText}>
+        <Pressable style={[styles.button, { backgroundColor: palette.accent }]} onPress={next}>
+          <Text style={[styles.buttonText, { color: palette.textOnAccent }]}>
             {activeIndex === SLIDES.length - 1 ? 'Get Started' : 'Next'}
           </Text>
         </Pressable>
@@ -118,71 +119,16 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A1518',
-  },
-  skipRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  skipText: {
-    color: '#8FA5AB',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  slide: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  icon: {
-    fontSize: 64,
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#E6F2F3',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  body: {
-    fontSize: 15,
-    color: '#8FA5AB',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  footer: {
-    paddingHorizontal: 32,
-    paddingBottom: 20,
-    alignItems: 'center',
-  },
-  dots: {
-    flexDirection: 'row',
-    marginBottom: 24,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#00979D',
-    marginHorizontal: 4,
-  },
-  button: {
-    backgroundColor: '#00979D',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    width: '100%',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  container: { flex: 1 },
+  skipRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 20, paddingVertical: 8 },
+  skipText: { fontSize: 14, fontWeight: '600' },
+  slide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  icon: { fontSize: 64, marginBottom: 24 },
+  title: { fontSize: 28, fontWeight: '800', marginBottom: 12, textAlign: 'center' },
+  body: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  footer: { paddingHorizontal: 32, paddingBottom: 20, alignItems: 'center' },
+  dots: { flexDirection: 'row', marginBottom: 24 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginHorizontal: 4 },
+  button: { borderRadius: 14, paddingVertical: 16, paddingHorizontal: 48, width: '100%', alignItems: 'center' },
+  buttonText: { fontWeight: '700', fontSize: 16 },
 });
