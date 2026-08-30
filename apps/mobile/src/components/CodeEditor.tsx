@@ -27,6 +27,7 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
   const { palette, textScale } = useTheme();
   const lines = useMemo(() => value.split('\n'), [value]);
   const lineCount = lines.length;
+  const lineNumbers = useMemo(() => Array.from({ length: Math.max(lineCount, 1) }, (_, i) => i + 1), [lineCount]);
   const errorLines = useMemo(
     () => new Set(diagnostics.filter((d) => d.severity === 'error').map((d) => d.line)),
     [diagnostics],
@@ -36,6 +37,7 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
   const LINE = Math.round(20 * textScale);
 
   const overlayScrollRef = useRef<ScrollView>(null);
+  const gutterRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -50,6 +52,7 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
     setScrollX(x);
     setScrollY(y);
     overlayScrollRef.current?.scrollTo({ x, y, animated: false });
+    gutterRef.current?.scrollToOffset({ offset: y, animated: false });
   }, []);
 
   // Track cursor position
@@ -95,37 +98,39 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
   return (
     <View style={[styles.container, { backgroundColor: palette.monoBg, borderColor: palette.surfaceBorder }]}>
       <View style={{ flexDirection: 'row' }}>
-        {/* line-number + error gutter */}
+        {/* line-number + error gutter (virtualized for large sketches) */}
         <View style={[styles.gutter, { backgroundColor: palette.gutter }]}>
-          <ScrollView
-            horizontal={false}
+          <FlatList
+            ref={gutterRef}
+            data={lineNumbers}
+            keyExtractor={(item) => String(item)}
             scrollEnabled={false}
             showsVerticalScrollIndicator={false}
+            getItemLayout={(_, index) => ({ length: LINE, offset: LINE * index, index })}
             contentContainerStyle={{ paddingVertical: 6 }}
-          >
-            {Array.from({ length: Math.max(lineCount, 1) }).map((_, i) => (
-              <View key={i} style={[styles.gutterRow, { height: LINE }]}>
+            renderItem={({ item: lineNum }) => (
+              <View style={[styles.gutterRow, { height: LINE }]}>
                 <Text
                   style={[
                     styles.gutterText,
                     {
-                      color: errorLines.has(i + 1)
+                      color: errorLines.has(lineNum)
                         ? palette.danger
-                        : i + 1 === cursorLine
+                        : lineNum === cursorLine
                           ? palette.accent
                           : palette.textMuted,
                       fontSize: Math.max(10, FONT - 2),
                     },
                   ]}
                 >
-                  {String(i + 1).padStart(3, ' ')}
+                  {String(lineNum).padStart(3, ' ')}
                 </Text>
-                {errorLines.has(i + 1) && (
+                {errorLines.has(lineNum) && (
                   <Text style={{ color: palette.danger, fontSize: 9 }}>{'\u25CF'}</Text>
                 )}
               </View>
-            ))}
-          </ScrollView>
+            )}
+          />
         </View>
 
         {/* editor surface */}

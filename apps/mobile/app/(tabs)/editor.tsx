@@ -121,6 +121,15 @@ export default function EditorScreen() {
   const [scrollToLine, setScrollToLine] = useState<number | undefined>(undefined);
   const [identifiedBoard, setIdentifiedBoard] = useState<BoardIdentity | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  // Undo/redo history
+  const [history, setHistory] = useState<string[]>([]);
+  const [redoStack, setRedoStack] = useState<string[]>([]);
+  const lastCodeRef = useRef(DEFAULT_CODE);
+  // Find/replace
+  const [showFind, setShowFind] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  const [findCount, setFindCount] = useState(0);
   const nativeUsb = isNativeUsbAvailable();
   const uploadDeviceRef = useRef<UsbDevice | null>(null);
   const uploadAbortedRef = useRef(false);
@@ -130,6 +139,61 @@ export default function EditorScreen() {
   useEffect(() => {
     buildStageRef.current = buildStage;
   }, [buildStage]);
+
+  // Track code changes for undo history (debounced — only snapshots meaningful edits)
+  useEffect(() => {
+    if (code === lastCodeRef.current) return;
+    const timer = setTimeout(() => {
+      setHistory((prev) => [...prev.slice(-49), lastCodeRef.current]);
+      setRedoStack([]);
+      lastCodeRef.current = code;
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [code]);
+
+  // Count find matches when text changes
+  useEffect(() => {
+    if (!findText) { setFindCount(0); return; }
+    let count = 0;
+    let pos = 0;
+    while ((pos = code.indexOf(findText, pos)) !== -1) {
+      count++;
+      pos += findText.length;
+    }
+    setFindCount(count);
+  }, [findText, code]);
+
+  function undo() {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setRedoStack((r) => [...r, code]);
+    setHistory((h) => h.slice(0, -1));
+    lastCodeRef.current = prev;
+    setCode(prev);
+  }
+
+  function redo() {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setHistory((h) => [...h, code]);
+    setRedoStack((r) => r.slice(0, -1));
+    lastCodeRef.current = next;
+    setCode(next);
+  }
+
+  function doReplace() {
+    if (!findText || findCount === 0) return;
+    const newCode = code.replace(findText, replaceText);
+    lastCodeRef.current = newCode;
+    setCode(newCode);
+  }
+
+  function doReplaceAll() {
+    if (!findText) return;
+    const newCode = code.split(findText).join(replaceText);
+    lastCodeRef.current = newCode;
+    setCode(newCode);
+  }
 
   // Load pending sketch from sketchBridge on mount
   useEffect(() => {
@@ -414,7 +478,10 @@ export default function EditorScreen() {
             <Text style={{ color: palette.accent, marginLeft: 4 }}>{boardOpen ? '\u25B2' : '\u25BC'}</Text>
           </Row>
         </Pressable>
-        <Row gap={8}>
+        <Row gap={4}>
+          <Button title="Undo" onPress={undo} disabled={history.length === 0} variant="ghost" size="sm" />
+          <Button title="Redo" onPress={redo} disabled={redoStack.length === 0} variant="ghost" size="sm" />
+          <Button title="Find" onPress={() => setShowFind(true)} variant="ghost" size="sm" />
           <Button
             title={saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Saved!' : 'Save'}
             onPress={doSave}
@@ -659,6 +726,41 @@ export default function EditorScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Find & Replace modal */}
+      <Modal visible={showFind} animationType="slide" transparent onRequestClose={() => setShowFind(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
+            <Row justify="space-between" style={{ marginBottom: 12 }}>
+              <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Find &amp; Replace</Text>
+              <Button title="Close" onPress={() => setShowFind(false)} variant="ghost" size="sm" />
+            </Row>
+            <TextInput
+              value={findText}
+              onChangeText={setFindText}
+              placeholder="Find..."
+              placeholderTextColor={palette.textMuted}
+              style={[styles.findInput, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface }]}
+            />
+            <TextInput
+              value={replaceText}
+              onChangeText={setReplaceText}
+              placeholder="Replace with..."
+              placeholderTextColor={palette.textMuted}
+              style={[styles.findInput, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface, marginTop: 8 }]}
+            />
+            <Row gap={8} style={{ marginTop: 12, flexWrap: 'wrap' }}>
+              <Button title="Replace" onPress={doReplace} disabled={findCount === 0} variant="ghost" size="sm" />
+              <Button title="Replace All" onPress={doReplaceAll} disabled={!findText} variant="ghost" size="sm" />
+            </Row>
+            {findText && (
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>
+                {findCount > 0 ? findCount + ' match' + (findCount !== 1 ? 'es' : '') + ' found' : 'No matches found'}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -761,4 +863,5 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
   },
   deviceItem: { padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
+  findInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
 });
