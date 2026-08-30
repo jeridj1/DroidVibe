@@ -34,17 +34,48 @@ try {
     });
   } catch (e2) {
     console.warn('[DroidVibe] Failed to load config plugins from @expo/config-plugins:', e2.message);
-    console.warn('[DroidVibe] Config plugins will NOT run — CI fallback patch will handle buildConfig');
+    console.warn('[DroidVibe] Config plugins will NOT run \u2014 CI fallback patch will handle buildConfig');
   }
+}
+
+/**
+ * Safely get the gradle.properties as an array of {key, value} objects.
+ * Different versions of @expo/config-plugins may provide modResults in
+ * different formats (PropertiesConfig object, raw string, or Map).
+ */
+function getGradleProps(modResults) {
+  // Case 1: PropertiesConfig with .properties array
+  if (modResults && Array.isArray(modResults.properties)) {
+    return modResults;
+  }
+  // Case 2: modResults is a raw string (the file content)
+  if (typeof modResults === 'string') {
+    return null; // Can't patch a raw string in-place
+  }
+  // Case 3: modResults has no properties field or it's not an array
+  if (modResults && !Array.isArray(modResults.properties)) {
+    console.warn('[DroidVibe] modResults.properties is not iterable:', typeof modResults.properties);
+    // Initialize properties as empty array if modResults is an object
+    if (typeof modResults === 'object' && modResults !== null) {
+      modResults.properties = [];
+      return modResults;
+    }
+  }
+  return null;
 }
 
 function withKotlinVersion(config) {
   if (!withGradleProperties) {
-    console.warn('[DroidVibe] withGradleProperties not available — skipping Kotlin version patch');
+    console.warn('[DroidVibe] withGradleProperties not available \u2014 skipping Kotlin version patch');
     return config;
   }
   return withGradleProperties(config, (cfg) => {
-    const props = cfg.modResults.properties;
+    const modResults = getGradleProps(cfg.modResults);
+    if (!modResults) {
+      console.warn('[DroidVibe] Could not get gradle.properties \u2014 skipping Kotlin version patch');
+      return cfg;
+    }
+    const props = modResults.properties;
 
     // --- Kotlin version: 1.9.24 -> 1.9.25 for Compose Compiler 1.5.15 ---
     let foundKotlin = false;
@@ -82,7 +113,7 @@ function withKotlinVersion(config) {
       props.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
     }
 
-    console.log('[DroidVibe] withKotlinVersion plugin applied — gradle.properties patched');
+    console.log('[DroidVibe] withKotlinVersion plugin applied \u2014 gradle.properties patched');
     return cfg;
   });
 }
@@ -98,7 +129,7 @@ function withKotlinVersion(config) {
  */
 function withBuildConfigEnabled(config) {
   if (!withAppBuildGradle) {
-    console.warn('[DroidVibe] withAppBuildGradle not available — skipping BuildConfig + namespace patch');
+    console.warn('[DroidVibe] withAppBuildGradle not available \u2014 skipping BuildConfig + namespace patch');
     return config;
   }
   return withAppBuildGradle(config, (cfg) => {
