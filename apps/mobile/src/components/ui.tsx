@@ -347,7 +347,7 @@ export function Switch({
   accessibilityLabel,
 }: {
   value: boolean;
-  onValueChange: (v | boolean) => void;
+  onValueChange: (v: boolean) => void;
   accessibilityLabel?: string;
 }) {
   const { palette } = useTheme();
