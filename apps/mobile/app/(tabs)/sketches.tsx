@@ -22,8 +22,7 @@ const EXAMPLE_CODE: Record<string, string> = {
   blink: '// DroidVibe \u2014 Blink\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(1000);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(1000);\n}\n',
   'serial-test': '// DroidVibe \u2014 Serial Test\nvoid setup() {\n  Serial.begin(9600);\n  Serial.println("DroidVibe Serial Test");\n}\n\nvoid loop() {\n  Serial.print("uptime_ms=");\n  Serial.println(millis());\n  delay(500);\n}\n',
   'analog-read': '// DroidVibe \u2014 Analog Read\nvoid setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int val = analogRead(A0);\n  Serial.print("A0=");\n  Serial.println(val);\n  delay(100);\n}\n',
-  'pico-blink': '// DroidVibe \u2014 Pico Blink (RP2040)\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite
-(LED_BUILTIN, HIGH);\n  delay(500);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(500);\n}\n',
+  'pico-blink': '// DroidVibe \u2014 Pico Blink (RP2040)\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(500);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(500);\n}\n',
 };
 
 const BLANK_CODE = '// New Sketch\nvoid setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n';
@@ -78,8 +77,7 @@ export default function SketchesScreen() {
   }
 
   async function addRecent(name: string, code: string) {
-    const newRecent = { name
-, code, openedAt: Date.now() };
+    const newRecent = { name, code, openedAt: Date.now() };
     const updated = [newRecent, ...recents.filter((r) => r.name !== name)].slice(0, 5);
     setRecents(updated);
     AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated)).catch(() => {});
@@ -116,7 +114,7 @@ export default function SketchesScreen() {
           <Text style={[styles.title, { color: palette.text }]}>Sketches</Text>
           <Row gap={6}>
             <Text style={{ color: palette.textMuted, fontSize: 13 }}>
-              Cloud · local · examples
+              Cloud Â· local Â· examples
             </Text>
             {offline && <Badge label="offline" tone="warn" dot />}
             {!offline && !loading && cloud && <Badge label="synced" tone="success" dot />}
@@ -134,8 +132,7 @@ export default function SketchesScreen() {
                 {recents.map((r, i) => (
                   <Card key={i} style={{ marginBottom: 8 }}>
                     <Pressable onPress={() => { setPendingSketch(r.code, r.name); router.push('/editor'); }}>
-                      
-<Row justify="space-between">
+                      <Row justify="space-between">
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 }}>{r.name}</Text>
                           <Text style={{ color: palette.textMuted, fontSize: 11 }}>{timeAgo(r.openedAt)}</Text>
@@ -170,18 +167,17 @@ export default function SketchesScreen() {
             {localSketches.length > 0 && (
               <>
                 <View style={{ height: 16 }} />
-                <SectionTitle title="Local sketches" subtitle="Stored on device — works offline" />
+                <SectionTitle title="Local sketches" subtitle="Stored on device â works offline" />
               </>
             )}
 
             {localSketches.map((sketch) => (
               <Card key={sketch.id} style={{ marginBottom: 10 }}>
                 <Pressable onPress={() => openLocalSketch(sketch)} onLongPress={() => deleteSketch(sketch.id)}>
-                  <Row 
-justify="space-between">
+                  <Row justify="space-between">
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{sketch.name}</Text>
-                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn} · {timeAgo(sketch.updatedAt)}</Text>
+                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn} Â· {timeAgo(sketch.updatedAt)}</Text>
                     </View>
                     <Badge label="local" tone="neutral" dot />
                   </Row>
@@ -192,7 +188,7 @@ justify="space-between">
             <View style={{ height: 16 }} />
             <SectionTitle
               title="Cloud sketches"
-              subtitle={offline ? 'Backend offline — showing local only' : undefined}
+              subtitle={offline ? 'Backend offline â showing local only' : undefined}
               action={offline ? <Badge label="offline" tone="warn" /> : !loading && cloud ? <Badge label="synced" tone="success" dot /> : undefined}
             />
             {loading && <ActivityIndicator color={palette.accent} />}
@@ -211,7 +207,7 @@ justify="space-between">
             <Row justify="space-between">
               <View style={{ flex: 1 }}>
                 <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{item.name}</Text>
-                <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn} · {timeAgo(item.updatedAt)}</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn} Â· {timeAgo(item.updatedAt)}</Text>
               </View>
               <Row gap={6}>
                 <Badge label="synced" tone="success" dot />
@@ -222,7 +218,6 @@ justify="space-between">
         )}
       />
     </View>
-
   );
 }
 
@@ -231,3 +226,4 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12 },
   title: { fontSize: 26, fontWeight: '800' },
 });
+
