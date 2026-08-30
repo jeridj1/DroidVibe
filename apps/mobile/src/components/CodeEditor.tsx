@@ -42,6 +42,7 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [cursorLine, setCursorLine] = useState(1);
+  const [matchingBracketLine, setMatchingBracketLine] = useState<number | null>(null);
   const [selectionOverride, setSelectionOverride] = useState<
     { start: number; end: number } | undefined
   >(undefined);
@@ -55,7 +56,7 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
     gutterRef.current?.scrollToOffset({ offset: y, animated: false });
   }, []);
 
-  // Track cursor position
+  // Track cursor position + bracket matching
   const handleSelectionChange = useCallback(
     (e: any) => {
       if (selectionOverride) return; // Ignore when we are programmatically setting selection
@@ -63,6 +64,27 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
       const textBeforeCursor = value.substring(0, start);
       const lineNum = textBeforeCursor.split('\n').length;
       setCursorLine(lineNum);
+
+      // Bracket matching: check character before and at cursor position
+      const brackets = '()[]{}';
+      let bracketPos = -1;
+      if (start < value.length && brackets.includes(value[start])) {
+        bracketPos = start;
+      } else if (start > 0 && brackets.includes(value[start - 1])) {
+        bracketPos = start - 1;
+      }
+
+      if (bracketPos >= 0) {
+        const matchPos = findMatchingBracket(value, bracketPos);
+        if (matchPos !== null) {
+          const matchLine = value.substring(0, matchPos).split('\n').length;
+          setMatchingBracketLine(matchLine);
+        } else {
+          setMatchingBracketLine(null);
+        }
+      } else {
+        setMatchingBracketLine(null);
+      }
     },
     [value, selectionOverride],
   );
@@ -118,7 +140,9 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
                         ? palette.danger
                         : lineNum === cursorLine
                           ? palette.accent
-                          : palette.textMuted,
+                          : lineNum === matchingBracketLine
+                            ? palette.accent
+                            : palette.textMuted,
                       fontSize: Math.max(10, FONT - 2),
                     },
                   ]}
@@ -173,6 +197,28 @@ export function CodeEditor({ value, onChange, diagnostics = [], scrollToLine }: 
       </View>
     </View>
   );
+}
+
+/** Find the position of the matching bracket, or null if not found. */
+function findMatchingBracket(text: string, pos: number): number | null {
+  const char = text[pos];
+  const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}', ')': '(', ']': '[', '}': '{' };
+  if (!pairs[char]) return null;
+  const openBrackets = '([{';
+  const isOpening = openBrackets.includes(char);
+  const target = pairs[char];
+  let depth = 1;
+  const step = isOpening ? 1 : -1;
+  let i = pos + step;
+  while (i >= 0 && i < text.length) {
+    if (text[i] === char) depth++;
+    else if (text[i] === target) {
+      depth--;
+      if (depth === 0) return i;
+    }
+    i += step;
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({

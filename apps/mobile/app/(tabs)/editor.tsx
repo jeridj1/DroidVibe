@@ -68,10 +68,10 @@ function failureSuggestion(message: string): string | null {
   return null;
 }
 
-function formatStageLabel(stage: UploadStage): string {
+function formatStageLabel(stage: UploadStage, protocol?: string): string {
   const labels: Record<UploadStage, string> = {
     preparing: 'Preparing firmware',
-    resetting: 'Resetting board',
+    resetting: protocol === 'avr109' ? 'Waiting for bootloader' : 'Resetting board',
     handshake: 'Establishing handshake',
     erasing: 'Erasing flash',
     writing: 'Writing firmware',
@@ -388,8 +388,11 @@ export default function EditorScreen() {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setBuildStage(newStage);
             }
-            setUploadStageDetail(formatStageLabel(p.stage));
+            setUploadStageDetail(formatStageLabel(p.stage, protocol));
             if (p.message) setUploadMsg(p.message);
+            else if (p.stage === 'resetting' && protocol === 'avr109') {
+              setUploadMsg('Waiting for bootloader to start...');
+            }
           },
         );
       }
