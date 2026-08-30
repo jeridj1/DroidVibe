@@ -77,7 +77,8 @@ export default function SketchesScreen() {
   }
 
   async function addRecent(name: string, code: string) {
-    const newRecent = { name, code, openedAt: Date.now() };
+    const newRecent =
+ { name, code, openedAt: Date.now() };
     const updated = [newRecent, ...recents.filter((r) => r.name !== name)].slice(0, 5);
     setRecents(updated);
     AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated)).catch(() => {});
@@ -114,7 +115,7 @@ export default function SketchesScreen() {
           <Text style={[styles.title, { color: palette.text }]}>Sketches</Text>
           <Row gap={6}>
             <Text style={{ color: palette.textMuted, fontSize: 13 }}>
-              Cloud Â· local Â· examples
+              Cloud · local · examples
             </Text>
             {offline && <Badge label="offline" tone="warn" dot />}
             {!offline && !loading && cloud && <Badge label="synced" tone="success" dot />}
@@ -133,7 +134,8 @@ export default function SketchesScreen() {
                   <Card key={i} style={{ marginBottom: 8 }}>
                     <Pressable onPress={() => { setPendingSketch(r.code, r.name); router.push('/editor'); }}>
                       <Row justify="space-between">
-                        <View style={{ flex: 1 }}>
+        
+                <View style={{ flex: 1 }}>
                           <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 }}>{r.name}</Text>
                           <Text style={{ color: palette.textMuted, fontSize: 11 }}>{timeAgo(r.openedAt)}</Text>
                         </View>
@@ -167,7 +169,7 @@ export default function SketchesScreen() {
             {localSketches.length > 0 && (
               <>
                 <View style={{ height: 16 }} />
-                <SectionTitle title="Local sketches" subtitle="Stored on device â works offline" />
+                <SectionTitle title="Local sketches" subtitle="Stored on device — works offline" />
               </>
             )}
 
@@ -175,9 +177,10 @@ export default function SketchesScreen() {
               <Card key={sketch.id} style={{ marginBottom: 10 }}>
                 <Pressable onPress={() => openLocalSketch(sketch)} onLongPress={() => deleteSketch(sketch.id)}>
                   <Row justify="space-between">
-                    <View style={{ flex: 1 }}>
+           
+         <View style={{ flex: 1 }}>
                       <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{sketch.name}</Text>
-                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn} Â· {timeAgo(sketch.updatedAt)}</Text>
+                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn} · {timeAgo(sketch.updatedAt)}</Text>
                     </View>
                     <Badge label="local" tone="neutral" dot />
                   </Row>
@@ -188,7 +191,7 @@ export default function SketchesScreen() {
             <View style={{ height: 16 }} />
             <SectionTitle
               title="Cloud sketches"
-              subtitle={offline ? 'Backend offline â showing local only' : undefined}
+              subtitle={offline ? 'Backend offline — showing local only' : undefined}
               action={offline ? <Badge label="offline" tone="warn" /> : !loading && cloud ? <Badge label="synced" tone="success" dot /> : undefined}
             />
             {loading && <ActivityIndicator color={palette.accent} />}
@@ -207,7 +210,7 @@ export default function SketchesScreen() {
             <Row justify="space-between">
               <View style={{ flex: 1 }}>
                 <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{item.name}</Text>
-                <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn} Â· {timeAgo(item.updatedAt)}</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn} · {timeAgo(item.updatedAt)}</Text>
               </View>
               <Row gap={6}>
                 <Badge label="synced" tone="success" dot />

@@ -50,8 +50,8 @@ export function WaveformViewer({ mode, palette, dataSource = 'demo', seriesData 
   // logic analyzer — 8 digital channels
   const channels = 8;
   const rows = Array.from({ length: channels }, (_, ch) =>
-    Array.from({ length: sampleC
-ount }, (_, i) => {
+   
+ Array.from({ length: sampleCount }, (_, i) => {
       if (ch === 0) return uartFrame(i, sampleCount);
       return (((i >> ch) + ch) % 4 < 2) ? 1 : 0;
     }),
@@ -88,8 +88,7 @@ ount }, (_, i) => {
 
       <View style={{ marginTop: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setCursorA((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>{'\u25C0 A \u25B6'}</Text></Pressable>
-        <Pressable onPress={() => setCursorB((c) => (c + 10) % 100)}><Text style={{ colo
-r: palette.accent, fontSize: 10 }}>{'\u25C0 B \u25B6'}</Text></Pressable>
+        <Pressable onPress={() => setCursorB((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>{'\u25C0 B \u25B6'}</Text></Pressable>
       </View>
 
       {isDemo && (
@@ -131,12 +130,12 @@ function uartFrame(i: number, n: number): number {
   const p = (i / n) * 30;
   const phase = p % 10;
   if (phase < 1) return 0;
-  if (phase < 9) return ((phase | 0) % 2);
+  if (phase < 9) return ((phase | 0) %
+ 2);
   return 1;
 }
 
-function useMemoSeries(n: number): nu
-mber[] {
+function useMemoSeries(n: number): number[] {
   return Array.from({ length: n }, (_, i) => Math.sin(i * 0.18) * Math.cos(i * 0.05));
 }
 

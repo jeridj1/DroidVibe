@@ -87,7 +87,8 @@ export default function SettingsScreen() {
       <Card style={{ marginBottom: 12 }}>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Native USB module</Text>
-          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'} />
+          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'
+} />
         </Row>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>App version</Text>
@@ -130,11 +131,11 @@ export default function SettingsScreen() {
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>Stack</Text>
-          <Text style={{ color: palette.text }}>Expo Â· Hono Â· Turso</Text>
+          <Text style={{ color: palette.text }}>Expo · Hono · Turso</Text>
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>USB protocols</Text>
-          <Text style={{ color: palette.text }}>STK500 Â· AVR109 Â· ESP Â· PICOBOOT</Text>
+          <Text style={{ color: palette.text }}>STK500 · AVR109 · ESP · PICOBOOT</Text>
         </Row>
       </Card>
 
