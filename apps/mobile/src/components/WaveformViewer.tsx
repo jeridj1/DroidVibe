@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import type { Palette } from '@/src/theme/colors';
 
 interface Props {
@@ -38,7 +38,7 @@ export function WaveformViewer({ mode, palette, dataSource = 'demo', seriesData 
           {series.map((v, i) => {
             const h = ((v - min) / (max - min)) * 100;
             return <View key={i} style={{ flex: 1, justifyContent: 'flex-end' }}>
-              <View style={{ height: Math.max(2, Math.min(100, h)) + '%', backgroundColor: palette.accent, borderRadius: 2 }} />
+              <View style={{ height: Math.max(2, Math.min(100, h)) + '%', backgroundColor: palette.accent, borderRadius: 2 } as ViewStyle} />
             </View>;
           })}
         </View>
@@ -50,7 +50,8 @@ export function WaveformViewer({ mode, palette, dataSource = 'demo', seriesData 
   // logic analyzer — 8 digital channels
   const channels = 8;
   const rows = Array.from({ length: channels }, (_, ch) =>
-    Array.from({ length: sampleCount }, (_, i) => {
+    Array.from({ length: sampleC
+ount }, (_, i) => {
       if (ch === 0) return uartFrame(i, sampleCount);
       return (((i >> ch) + ch) % 4 < 2) ? 1 : 0;
     }),
@@ -77,8 +78,8 @@ export function WaveformViewer({ mode, palette, dataSource = 'demo', seriesData 
         ))}
       </View>
 
-      <View style={{ height: 2, backgroundColor: palette.danger, opacity: 0.5, marginVertical: 4, marginLeft: cursorA + '%' }} />
-      <View style={{ height: 2, backgroundColor: palette.typeColor, opacity: 0.5, marginBottom: 4, marginLeft: cursorB + '%' }} />
+      <View style={{ height: 2, backgroundColor: palette.danger, opacity: 0.5, marginVertical: 4, marginLeft: cursorA + '%' } as ViewStyle} />
+      <View style={{ height: 2, backgroundColor: palette.typeColor, opacity: 0.5, marginBottom: 4, marginLeft: cursorB + '%' } as ViewStyle} />
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text style={{ color: palette.monoText, fontSize: 10 }}>{'\u0394t = ' + delta + ' samples'}</Text>
@@ -87,7 +88,8 @@ export function WaveformViewer({ mode, palette, dataSource = 'demo', seriesData 
 
       <View style={{ marginTop: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setCursorA((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>{'\u25C0 A \u25B6'}</Text></Pressable>
-        <Pressable onPress={() => setCursorB((c) => (c + 10) % 100)}><Text style={{ color: palette.accent, fontSize: 10 }}>{'\u25C0 B \u25B6'}</Text></Pressable>
+        <Pressable onPress={() => setCursorB((c) => (c + 10) % 100)}><Text style={{ colo
+r: palette.accent, fontSize: 10 }}>{'\u25C0 B \u25B6'}</Text></Pressable>
       </View>
 
       {isDemo && (
@@ -133,7 +135,8 @@ function uartFrame(i: number, n: number): number {
   return 1;
 }
 
-function useMemoSeries(n: number): number[] {
+function useMemoSeries(n: number): nu
+mber[] {
   return Array.from({ length: n }, (_, i) => Math.sin(i * 0.18) * Math.cos(i * 0.05));
 }
 

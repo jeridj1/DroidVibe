@@ -10,6 +10,7 @@ import {
   FlatList,
   TextInput,
   LayoutAnimation,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
@@ -51,7 +52,8 @@ function failureSuggestion(message: string): string | null {
     return 'USB permission was denied. Go to the Devices tab and tap "Allow access".';
   }
   if (msg.includes('timeout') || msg.includes('handshake')) {
-    return 'The board did not respond. Press the reset button and try again.';
+    return 'The board did not respond. Press the reset button and
+ try again.';
   }
   if (msg.includes('verification') || msg.includes('verify')) {
     return 'Firmware was written but verification failed. The board may have an incompatible bootloader.';
@@ -104,6 +106,7 @@ export default function EditorScreen() {
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [buildStage, setBuildStage] = useState<string>('idle');
   const [uploadStageDetail, setUploadStageDetail] = useState<string | null>(null);
+
   const [progress, setProgress] = useState(0);
   const [ai, setAi] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +146,8 @@ export default function EditorScreen() {
   // Track code changes for undo history (debounced — only snapshots meaningful edits)
   useEffect(() => {
     if (code === lastCodeRef.current) return;
-    const timer = setTimeout(() => {
+    const timer = setTimeout((
+) => {
       setHistory((prev) => [...prev.slice(-49), lastCodeRef.current]);
       setRedoStack([]);
       lastCodeRef.current = code;
@@ -214,7 +218,8 @@ export default function EditorScreen() {
     const unsub = addDeviceListener((e) => {
       if (e.type === 'detach' && uploadDeviceRef.current && e.device.id === uploadDeviceRef.current.id) {
         if (uploading) {
-          uploadAbortedRef.current = true;
+          uploadAbor
+tedRef.current = true;
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setBuildStage('failed');
           setUploadMsg('USB disconnected during upload.');
@@ -274,7 +279,8 @@ export default function EditorScreen() {
 
   async function startUpload() {
     if (!nativeUsb) {
-      setError('Native USB unavailable. Build a DroidVibe dev/production APK to access USB hardware.');
+      setError('Native U
+SB unavailable. Build a DroidVibe dev/production APK to access USB hardware.');
       setErrorSuggestion(failureSuggestion('Native USB unavailable'));
       return;
     }
@@ -326,7 +332,8 @@ export default function EditorScreen() {
     } else {
       setBuildStage('failed');
       setUploadMsg(result.message);
-      setErrorSuggestion(failureSuggestion(result.message));
+      setErrorSuggestion(failureSuggestion(result.mess
+age));
     }
   }
 
@@ -385,7 +392,8 @@ export default function EditorScreen() {
             setProgress(p.progress);
             const newStage = STAGE_MAP[p.stage] ?? 'uploading';
             if (newStage !== buildStageRef.current) {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              LayoutAnimation.configureNext
+(LayoutAnimation.Presets.easeInEaseOut);
               setBuildStage(newStage);
             }
             setUploadStageDetail(formatStageLabel(p.stage, protocol));
@@ -457,7 +465,8 @@ export default function EditorScreen() {
   }
 
   async function doSave() {
-    setSaveState('saving');
+   
+ setSaveState('saving');
     try {
       await saveLocalSketch({ name: sketchName, code, fqbn });
       setSaveState('saved');
@@ -510,7 +519,8 @@ export default function EditorScreen() {
             loading={uploading}
           />
         </Row>
-      </View>
+     
+ </View>
 
       {!nativeUsb && (
         <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
@@ -559,7 +569,8 @@ export default function EditorScreen() {
       </View>
 
       <View style={[styles.bottomPanel, { backgroundColor: palette.bgElevated, borderColor: palette.surfaceBorder }]}>
-        <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+        <Row style={{ justifyContent: 'space-between', marginBottom:
+ 6 }}>
           <SectionTitle
             title="Output"
             subtitle={compiling ? 'Compiling...' : uploading ? 'Uploading...' : undefined}
@@ -608,7 +619,8 @@ export default function EditorScreen() {
                 <Row>
                   <Badge
                     label={d.severity}
-                    tone={d.severity === 'error' ? 'danger' : d.severity === 'warning' ? 'warn' : 'neutral'}
+                    tone=
+{d.severity === 'error' ? 'danger' : d.severity === 'warning' ? 'warn' : 'neutral'}
                   />
                   <Text style={{ color: palette.text, marginLeft: 8, fontSize: 13 }}>
                     {d.file}:{d.line}:{d.column}
@@ -651,7 +663,8 @@ export default function EditorScreen() {
                 <Button
                   title={aiLoading ? 'Generating...' : 'Generate'}
                   onPress={doGenerate}
-                  disabled={aiLoading}
+      
+            disabled={aiLoading}
                   loading={aiLoading}
                 />
               </Row>
@@ -693,7 +706,8 @@ export default function EditorScreen() {
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
             <Row style={{ justifyContent: 'space-between', marginBottom: 12 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Select device</Text>
-              <Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
+              
+<Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
             </Row>
             <FlatList
               data={devices}
@@ -736,7 +750,8 @@ export default function EditorScreen() {
       </Modal>
 
       {/* Find & Replace modal */}
-      <Modal visible={showFind} animationType="slide" transparent onRequestClose={() => setShowFind(false)}>
+      <Modal visible={showFind} animationType="slide
+" transparent onRequestClose={() => setShowFind(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
             <Row justify="space-between" style={{ marginBottom: 12 }}>
@@ -774,7 +789,8 @@ export default function EditorScreen() {
 }
 
 function BuildStageBar({ stage, progress, palette }: { stage: string; progress: number; palette: any }) {
-  const stages = ['idle', 'compiling', 'connecting', 'uploading', 'verifying', 'verified'];
+  const stages
+ = ['idle', 'compiling', 'connecting', 'uploading', 'verifying', 'verified'];
   const stageLabels: Record<string, string> = {
     idle: 'Idle',
     compiling: 'Compile',
@@ -831,7 +847,7 @@ function BuildStageBar({ stage, progress, palette }: { stage: string; progress: 
           }}
         >
           <View
-            style={{ height: '100%', width: Math.round(progress * 100) + '%', backgroundColor: palette.accent }}
+            style={{ height: '100%', width: Math.round(progress * 100) + '%', backgroundColor: palette.accent } as ViewStyle}
           />
         </View>
       )}
@@ -839,7 +855,8 @@ function BuildStageBar({ stage, progress, palette }: { stage: string; progress: 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = Style
+Sheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -861,15 +878,6 @@ const styles = StyleSheet.create({
   boardPicker: { paddingVertical: 4 },
   boardList: { paddingHorizontal: 12, paddingBottom: 8 },
   boardItem: { paddingVertical: 8, borderBottomWidth: 0.5, borderColor: 'rgba(150,150,150,0.2)' },
-  bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 16 },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  deviceItem: { padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
-  findInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-});
+  bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddin
+
+... [Content truncated]
