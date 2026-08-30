@@ -2,12 +2,6 @@ import React from 'react';
 import { Text } from 'react-native';
 import { useTheme } from '@/src/theme/ThemeProvider';
 
-/**
- * Lightweight Arduino/C++ tokenizer for read-only syntax coloring. Renders a
- * sequence of colored <Text> spans. Designed to mirror the editing TextInput
- * exactly (same font family/size/line height) so it can be used as an overlay.
- */
-
 const KEYWORDS = new Set([
   'void', 'int', 'char', 'float', 'double', 'bool', 'boolean', 'byte', 'long',
   'short', 'unsigned', 'const', 'static', 'return', 'if', 'else', 'for', 'while',
@@ -33,7 +27,6 @@ export function tokenize(code: string): Token[] {
   const n = code.length;
   while (i < n) {
     const c = code[i];
-    // line comment
     if (c === '/' && code[i + 1] === '/') {
       let j = i;
       while (j < n && code[j] !== '\n') j++;
@@ -41,7 +34,6 @@ export function tokenize(code: string): Token[] {
       i = j;
       continue;
     }
-    // block comment
     if (c === '/' && code[i + 1] === '*') {
       let j = i + 2;
       while (j < n && !(code[j] === '*' && code[j + 1] === '/')) j++;
@@ -50,7 +42,6 @@ export function tokenize(code: string): Token[] {
       i = j;
       continue;
     }
-    // preprocessor
     if (c === '#' && (i === 0 || code[i - 1] === '\n')) {
       let j = i;
       while (j < n && code[j] !== '\n' && code[j] !== '\r') j++;
@@ -58,7 +49,6 @@ export function tokenize(code: string): Token[] {
       i = j;
       continue;
     }
-    // string / char
     if (c === '"' || c === "'") {
       const quote = c;
       let j = i + 1;
@@ -71,7 +61,6 @@ export function tokenize(code: string): Token[] {
       i = j;
       continue;
     }
-    // number
     if (/[0-9]/.test(c)) {
       let j = i;
       while (j < n && /[0-9a-fA-FxX._]/.test(code[j])) j++;
@@ -79,7 +68,6 @@ export function tokenize(code: string): Token[] {
       i = j;
       continue;
     }
-    // identifier / keyword
     if (/[A-Za-z_]/.test(c)) {
       let j = i;
       while (j < n && /[A-Za-z0-9_]/.test(code[j])) j++;
@@ -91,7 +79,6 @@ export function tokenize(code: string): Token[] {
       i = j;
       continue;
     }
-    // whitespace / punctuation / newlines — emit raw
     let j = i;
     while (j < n && !/[A-Za-z0-9_"'#/]/.test(code[j])) j++;
     if (j === i) j = i + 1;
@@ -101,11 +88,11 @@ export function tokenize(code: string): Token[] {
   return tokens;
 }
 
-export function HighlightedText({ code }: { code: string }) {
+export function HighlightedText({ code, fontSize = 14, lineHeight = 20 }: { code: string; fontSize?: number; lineHeight?: number }) {
   const { palette } = useTheme();
   const tokens = tokenize(code);
   return (
-    <Text style={{ fontFamily: 'monospace', fontSize: 14, lineHeight: 20 }}>
+    <Text style={{ fontFamily: 'monospace', fontSize, lineHeight }}>
       {tokens.map((t, idx) => {
         const color =
           t.type === 'comment' ? palette.commentColor :
