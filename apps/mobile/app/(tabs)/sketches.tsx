@@ -113,9 +113,13 @@ export default function SketchesScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: palette.text }]}>Sketches</Text>
-          <Text style={{ color: palette.textMuted, fontSize: 13 }}>
-            Cloud · local · examples
-          </Text>
+          <Row gap={6}>
+            <Text style={{ color: palette.textMuted, fontSize: 13 }}>
+              Cloud · local · examples
+            </Text>
+            {offline && <Badge label="offline" tone="warn" dot />}
+            {!offline && !loading && cloud && <Badge label="synced" tone="success" dot />}
+          </Row>
         </View>
         <Button title="+ New Sketch" onPress={newSketch} size="lg" />
       </View>
@@ -183,9 +187,17 @@ export default function SketchesScreen() {
             ))}
 
             <View style={{ height: 16 }} />
-            <SectionTitle title="Cloud sketches" subtitle={offline ? 'Backend offline — showing local only' : undefined} />
+            <SectionTitle
+              title="Cloud sketches"
+              subtitle={offline ? 'Backend offline — showing local only' : undefined}
+              action={offline ? <Badge label="offline" tone="warn" /> : !loading && cloud ? <Badge label="synced" tone="success" dot /> : undefined}
+            />
             {loading && <ActivityIndicator color={palette.accent} />}
-            {offline && <Text style={{ color: palette.warning, fontSize: 13 }}>Backend unreachable. Start the server (pnpm web:dev).</Text>}
+            {offline && (
+              <Text style={{ color: palette.warning, fontSize: 13 }}>
+                Backend unreachable. Start the server (pnpm web:dev). Local sketches remain available.
+              </Text>
+            )}
           </>
         }
         data={cloud ?? []}
@@ -198,7 +210,10 @@ export default function SketchesScreen() {
                 <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{item.name}</Text>
                 <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn} · {timeAgo(item.updatedAt)}</Text>
               </View>
-              <Badge label={item.port ? item.port : 'no port'} tone="neutral" />
+              <Row gap={6}>
+                <Badge label="synced" tone="success" dot />
+                <Badge label={item.port ? item.port : 'no port'} tone="neutral" />
+              </Row>
             </Row>
           </Card>
         )}

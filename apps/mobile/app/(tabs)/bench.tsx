@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable, TextInput, FlatList, Modal, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
-import { Card, Badge, Button, Row, SectionTitle, EmptyState } from '@/src/components/ui';
+import { Card, Badge, Button, Row, SectionTitle } from '@/src/components/ui';
 import { WaveformViewer } from '@/src/components/WaveformViewer';
 import {
   listDevices,
@@ -20,6 +20,7 @@ type Tab = 'serial' | 'plotter' | 'logic';
 
 const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400];
 const MAX_LINES = 500;
+const MAX_PLOTTER_POINTS = 240;
 
 function bytesToText(data: Uint8Array): string {
   let result = '';
@@ -43,14 +44,18 @@ export default function BenchScreen() {
   const [baudRate, setBaudRate] = useState(115200);
   const [inputText, setInputText] = useState('');
   const [disconnected, setDisconnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [plotterData, setPlotterData] = useState<number[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const pausedRef = useRef(false);
   const deviceIdRef = useRef<string | null>(null);
+  const lastDeviceRef = useRef<UsbDevice | null>(null);
+  const plotterBufferRef = useRef<string>('');
 
   useEffect(() => { pausedRef.current = paused; }, [paused]);
 
-  // Listen for USB detach events to detect disconnection
+  // Listen for USB detach events to detect disconnection + auto-reconnect
   useEffect(() => {
     const unsub = addDeviceListener((e) => {
       if (e.type === 'detach' && deviceIdRef.current === e.device.id) {
@@ -60,9 +65,22 @@ export default function BenchScreen() {
         if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
         deviceIdRef.current = null;
       }
+      if (e.type === 'attach' && disconnected && lastDeviceRef.current) {
+        // Auto-reconnect: try to re-open the serial port
+        const reattach = e.device;
+        const expectedVendor = lastDeviceRef.current.vendorId;
+        const expectedProduct = lastDeviceRef.current.productId;
+        if (reattach.vendorId === expectedVendor && reattach.productId === expectedProduct) {
+          setReconnecting(true);
+          setLines((prev) => [...prev, '> Device reconnected. Re-opening serial port...']);
+          setTimeout(() => {
+            reconnectSerial(reattach);
+          }, 1000);
+        }
+      }
     });
     return () => { unsub(); };
-  }, []);
+  }, [disconnected, connectedDevice]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -86,20 +104,28 @@ export default function BenchScreen() {
   async function selectDevice(device: UsbDevice) {
     setShowDevicePicker(false);
     setDisconnected(false);
+    await openSerialConnection(device);
+  }
+
+  async function openSerialConnection(device: UsbDevice) {
     try {
       const opts: SerialOptions = { ...DEFAULT_SERIAL_OPTIONS, baudRate };
       const ok = await openSerial(device.id, opts);
       if (!ok) {
         setLines((prev) => [...prev, '> Failed to open serial port. The board may be in use by another app.']);
-        return;
+        return false;
       }
       setConnectedDevice(device);
       deviceIdRef.current = device.id;
+      lastDeviceRef.current = device;
       setLines((prev) => [...prev, '> Connected to ' + (device.productName ?? device.id) + ' at ' + baudRate + ' baud.']);
+      setPlotterData([]);
 
       const unsub = addSerialDataListener(device.id, (data: Uint8Array) => {
         if (pausedRef.current) return;
         const text = bytesToText(data);
+
+        // Serial monitor: accumulate lines
         setLines((prev) => {
           const newLines = text.split('\n');
           const combined = [...prev];
@@ -109,13 +135,39 @@ export default function BenchScreen() {
             combined.push(newLines[0]);
           }
           for (let i = 1; i < newLines.length; i++) combined.push(newLines[i]);
-          // Ring buffer: keep last MAX_LINES
           return combined.slice(-MAX_LINES);
         });
+
+        // Plotter: parse numeric values from serial output
+        plotterBufferRef.current += text;
+        const bufLines = plotterBufferRef.current.split('\n');
+        plotterBufferRef.current = bufLines.pop() ?? '';
+        for (const line of bufLines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          // Parse first numeric value (Arduino Serial Plotter format: val1,val2,...)
+          const firstVal = parseFloat(trimmed.split(',')[0]);
+          if (!isNaN(firstVal)) {
+            setPlotterData((prev) => [...prev.slice(-(MAX_PLOTTER_POINTS - 1)), firstVal]);
+          }
+        }
       });
       unsubRef.current = unsub;
+      return true;
     } catch (e) {
       setLines((prev) => [...prev, '> Error: ' + (e as Error).message]);
+      return false;
+    }
+  }
+
+  async function reconnectSerial(device: UsbDevice) {
+    const ok = await openSerialConnection(device);
+    setReconnecting(false);
+    if (ok) {
+      setDisconnected(false);
+      setLines((prev) => [...prev, '> Reconnected successfully.']);
+    } else {
+      setLines((prev) => [...prev, '> Reconnection failed. Tap Connect to try manually.']);
     }
   }
 
@@ -152,6 +204,15 @@ export default function BenchScreen() {
     }
   }
 
+  async function exportPlotterCSV() {
+    try {
+      const csv = plotterData.map((v, i) => i + ',' + v).join('\n');
+      await Share.share({ message: 'index,value\n' + csv, title: 'DroidVibe Plotter Export' });
+    } catch (e) {
+      setLines((prev) => [...prev, '> CSV export error: ' + (e as Error).message]);
+    }
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
@@ -177,13 +238,15 @@ export default function BenchScreen() {
             <SectionTitle
               title="Serial monitor"
               subtitle={
-                disconnected
-                  ? 'Device disconnected — reconnect to resume'
-                  : connectedDevice
-                    ? (connectedDevice.productName ?? connectedDevice.id) + ' · ' + baudRate + ' baud'
-                    : nativeUsb
-                      ? 'Not connected — tap Connect'
-                      : 'Native USB unavailable (Expo Go)'
+                reconnecting
+                  ? 'Reconnecting...'
+                  : disconnected
+                    ? 'Device disconnected — reconnecting automatically'
+                    : connectedDevice
+                      ? (connectedDevice.productName ?? connectedDevice.id) + ' · ' + baudRate + ' baud'
+                      : nativeUsb
+                        ? 'Not connected — tap Connect'
+                        : 'Native USB unavailable (Expo Go)'
               }
             />
 
@@ -195,7 +258,7 @@ export default function BenchScreen() {
               </View>
             )}
 
-            {disconnected && (
+            {disconnected && !reconnecting && (
               <View style={[styles.banner, { backgroundColor: palette.danger + '18', borderColor: palette.danger }]}>
                 <Text style={{ color: palette.danger, fontSize: 12 }}>
                   USB device disconnected. Reconnect the board to resume streaming.
@@ -203,9 +266,17 @@ export default function BenchScreen() {
               </View>
             )}
 
+            {reconnecting && (
+              <View style={[styles.banner, { backgroundColor: palette.accent + '18', borderColor: palette.accent }]}>
+                <Text style={{ color: palette.accent, fontSize: 12 }}>
+                  Reconnecting to device...
+                </Text>
+              </View>
+            )}
+
             <Row gap={8} style={{ marginBottom: 8, flexWrap: 'wrap' }}>
               {!connectedDevice ? (
-                <Button title="Connect" onPress={connectSerial} disabled={!nativeUsb} />
+                <Button title="Connect" onPress={connectSerial} disabled={!nativeUsb || reconnecting} loading={reconnecting} />
               ) : (
                 <Button title="Disconnect" onPress={disconnectSerial} variant="danger" />
               )}
@@ -261,13 +332,37 @@ export default function BenchScreen() {
 
         {tab === 'plotter' && (
           <>
-            <SectionTitle title="Serial plotter" subtitle="Numeric values per line, one series per column" />
+            <SectionTitle
+              title="Serial plotter"
+              subtitle={
+                connectedDevice
+                  ? 'Live data from ' + (connectedDevice.productName ?? connectedDevice.id)
+                  : 'Demo data — connect a board to stream real values'
+              }
+            />
             <Card style={{ height: 260, padding: 8, backgroundColor: palette.monoBg }}>
-              <WaveformViewer mode="plotter" palette={palette} dataSource="demo" />
+              <WaveformViewer
+                mode="plotter"
+                palette={palette}
+                dataSource={connectedDevice ? 'serial' : 'demo'}
+                seriesData={connectedDevice && plotterData.length > 0 ? plotterData : undefined}
+              />
             </Card>
-            <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
-              Plotter currently shows demo data. Wiring to real serial data is planned.
-            </Text>
+            {connectedDevice && plotterData.length > 0 && (
+              <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
+                {plotterData.length} data points buffered. Parsing first numeric value per line.
+              </Text>
+            )}
+            {!connectedDevice && (
+              <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
+                Plotter shows demo data. Connect a board and stream values via Serial.print() to see live plots.
+              </Text>
+            )}
+            {connectedDevice && plotterData.length > 0 && (
+              <Row gap={8} style={{ marginTop: 8 }}>
+                <Button title="Export CSV" onPress={exportPlotterCSV} variant="ghost" size="sm" />
+              </Row>
+            )}
           </>
         )}
 

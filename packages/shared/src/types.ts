@@ -75,7 +75,8 @@ export interface UploadRequest {
   verify: boolean;
 }
 
-/** Staged progress reported during upload. Never report "done" on failure. */
+/** Staged progress reported during upload. 
+Never report "done" on failure. */
 export type UploadStage =
   | 'preparing'
   | 'resetting'
@@ -102,6 +103,15 @@ export interface UploadResult {
   stage: UploadStage;
   verified: boolean;
   message: string;
+}
+
+/** Hardware error with actionable suggestion for the user. */
+export interface HardwareError {
+  message: string;
+  /** Plain-English suggestion for resolving the error. */
+  suggestion: string | null;
+  /** The upload stage at which the error occurred, if applicable. */
+  stage?: UploadStage;
 }
 
 /** Logic-analyzer capture configuration. */

@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@droidvibe/local_sketches';
+const LAST_BOARD_KEY = '@droidvibe/last_used_board';
 
 export interface LocalSketch {
   id: string;
@@ -50,4 +51,22 @@ export async function deleteLocalSketch(id: string): Promise<void> {
   const sketches = await getLocalSketches();
   const filtered = sketches.filter(s => s.id !== id);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+}
+
+/** Remember the last-used board (FQBN) so the editor can pre-select it. */
+export async function getLastUsedBoard(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(LAST_BOARD_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the last-used board for future sessions. */
+export async function setLastUsedBoard(fqbn: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_BOARD_KEY, fqbn);
+  } catch {
+    // Best-effort — don't block on storage errors.
+  }
 }

@@ -19,7 +19,7 @@ import { api } from '@/src/lib/api';
 import { listDevices, upload, flashUf2, isNativeUsbAvailable, addDeviceListener } from '@/src/lib/transport';
 import { identifyBoard } from '@droidvibe/shared';
 import { consumePendingSketch } from '@/src/lib/sketchBridge';
-import { saveLocalSketch } from '@/src/lib/offlineSketches';
+import { saveLocalSketch, getLastUsedBoard, setLastUsedBoard } from '@/src/lib/offlineSketches';
 import type { Diagnostic, UsbDevice, UploadProtocol, UploadProgress, UploadStage, BoardIdentity } from '@droidvibe/shared';
 
 const DEFAULT_CODE = `// DroidVibe - Blink
@@ -202,6 +202,10 @@ export default function EditorScreen() {
       setCode(pending.code);
       setSketchName(pending.name);
     }
+    // Pre-select last-used board
+    getLastUsedBoard().then((lastBoard) => {
+      if (lastBoard) setFqbn(lastBoard);
+    });
   }, []);
 
   // USB disconnect detection — abort in-progress upload
@@ -535,6 +539,7 @@ export default function EditorScreen() {
               key={b.fqbn}
               onPress={() => {
                 setFqbn(b.fqbn);
+                setLastUsedBoard(b.fqbn);
                 setBoardOpen(false);
               }}
               style={styles.boardItem}
