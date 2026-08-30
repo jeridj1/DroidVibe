@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, TextInput, FlatList, Modal } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, TextInput, FlatList, Modal, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
-import { Card, Badge, Button, Row, SectionTitle } from '@/src/components/ui';
+import { Card, Badge, Button, Row, SectionTitle, EmptyState } from '@/src/components/ui';
 import { WaveformViewer } from '@/src/components/WaveformViewer';
 import {
   listDevices,
@@ -10,6 +10,7 @@ import {
   closeSerial,
   writeSerial,
   addSerialDataListener,
+  addDeviceListener,
   isNativeUsbAvailable,
 } from '@/src/lib/transport';
 import { identifyBoard, DEFAULT_SERIAL_OPTIONS } from '@droidvibe/shared';
@@ -18,6 +19,7 @@ import type { UsbDevice, SerialOptions } from '@droidvibe/shared';
 type Tab = 'serial' | 'plotter' | 'logic';
 
 const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400];
+const MAX_LINES = 500;
 
 function bytesToText(data: Uint8Array): string {
   let result = '';
@@ -34,33 +36,39 @@ export default function BenchScreen() {
   const [paused, setPaused] = useState(false);
   const [lines, setLines] = useState<string[]>(['> Serial monitor ready.', '> Connect a board to stream data.']);
 
-  // Serial connection state
   const nativeUsb = isNativeUsbAvailable();
   const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [devices, setDevices] = useState<UsbDevice[]>([]);
   const [connectedDevice, setConnectedDevice] = useState<UsbDevice | null>(null);
   const [baudRate, setBaudRate] = useState(115200);
   const [inputText, setInputText] = useState('');
+  const [disconnected, setDisconnected] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const pausedRef = useRef(false);
   const deviceIdRef = useRef<string | null>(null);
 
-  // Keep pausedRef in sync with paused state for use in closures
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
+  // Listen for USB detach events to detect disconnection
   useEffect(() => {
-    pausedRef.current = paused;
-  }, [paused]);
+    const unsub = addDeviceListener((e) => {
+      if (e.type === 'detach' && deviceIdRef.current === e.device.id) {
+        setDisconnected(true);
+        setConnectedDevice(null);
+        setLines((prev) => [...prev, '> USB device disconnected.']);
+        if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+        deviceIdRef.current = null;
+      }
+    });
+    return () => { unsub(); };
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (unsubRef.current) {
-        unsubRef.current();
-        unsubRef.current = null;
-      }
-      if (deviceIdRef.current) {
-        closeSerial(deviceIdRef.current).catch(() => {});
-      }
+      if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+      if (deviceIdRef.current) { closeSerial(deviceIdRef.current).catch(() => {}); }
     };
   }, []);
 
@@ -77,49 +85,42 @@ export default function BenchScreen() {
 
   async function selectDevice(device: UsbDevice) {
     setShowDevicePicker(false);
+    setDisconnected(false);
     try {
       const opts: SerialOptions = { ...DEFAULT_SERIAL_OPTIONS, baudRate };
       const ok = await openSerial(device.id, opts);
       if (!ok) {
-        setLines((prev) => [...prev, '> Failed to open serial port.']);
+        setLines((prev) => [...prev, '> Failed to open serial port. The board may be in use by another app.']);
         return;
       }
       setConnectedDevice(device);
       deviceIdRef.current = device.id;
-      setLines((prev) => [...prev, `> Connected to ${device.productName ?? device.id} at ${baudRate} baud.`]);
+      setLines((prev) => [...prev, '> Connected to ' + (device.productName ?? device.id) + ' at ' + baudRate + ' baud.']);
 
-      // Listen for incoming data
       const unsub = addSerialDataListener(device.id, (data: Uint8Array) => {
         if (pausedRef.current) return;
         const text = bytesToText(data);
         setLines((prev) => {
           const newLines = text.split('\n');
           const combined = [...prev];
-          // Append first fragment to last line
           if (combined.length > 0 && !combined[combined.length - 1].startsWith('>')) {
             combined[combined.length - 1] += newLines[0];
           } else {
             combined.push(newLines[0]);
           }
-          // Add remaining lines
-          for (let i = 1; i < newLines.length; i++) {
-            combined.push(newLines[i]);
-          }
-          // Keep last 500 lines
-          return combined.slice(-500);
+          for (let i = 1; i < newLines.length; i++) combined.push(newLines[i]);
+          // Ring buffer: keep last MAX_LINES
+          return combined.slice(-MAX_LINES);
         });
       });
       unsubRef.current = unsub;
     } catch (e) {
-      setLines((prev) => [...prev, `> Error: ${(e as Error).message}`]);
+      setLines((prev) => [...prev, '> Error: ' + (e as Error).message]);
     }
   }
 
   async function disconnectSerial() {
-    if (unsubRef.current) {
-      unsubRef.current();
-      unsubRef.current = null;
-    }
+    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
     if (connectedDevice) {
       await closeSerial(connectedDevice.id).catch(() => {});
       setConnectedDevice(null);
@@ -132,15 +133,22 @@ export default function BenchScreen() {
     if (!connectedDevice || !inputText.trim()) return;
     try {
       const bytes = new Uint8Array(inputText.length + 1);
-      for (let i = 0; i < inputText.length; i++) {
-        bytes[i] = inputText.charCodeAt(i);
-      }
-      bytes[inputText.length] = 10; // newline
+      for (let i = 0; i < inputText.length; i++) bytes[i] = inputText.charCodeAt(i);
+      bytes[inputText.length] = 10;
       await writeSerial(connectedDevice.id, bytes);
-      setLines((prev) => [...prev, `> sent: ${inputText}`]);
+      setLines((prev) => [...prev, '> sent: ' + inputText]);
       setInputText('');
     } catch (e) {
-      setLines((prev) => [...prev, `> Send error: ${(e as Error).message}`]);
+      setLines((prev) => [...prev, '> Send error: ' + (e as Error).message]);
+    }
+  }
+
+  async function exportSerial() {
+    try {
+      const content = lines.join('\n');
+      await Share.share({ message: content, title: 'DroidVibe Serial Export' });
+    } catch (e) {
+      setLines((prev) => [...prev, '> Export error: ' + (e as Error).message]);
     }
   }
 
@@ -148,7 +156,7 @@ export default function BenchScreen() {
     <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: palette.text }]}>Bench</Text>
-        <Row>
+        <Row gap={6}>
           {(['serial', 'plotter', 'logic'] as Tab[]).map((t) => (
             <Pressable
               key={t}
@@ -169,11 +177,13 @@ export default function BenchScreen() {
             <SectionTitle
               title="Serial monitor"
               subtitle={
-                connectedDevice
-                  ? `${connectedDevice.productName ?? connectedDevice.id} · ${baudRate} baud`
-                  : nativeUsb
-                    ? 'Not connected — tap Connect'
-                    : 'Native USB unavailable (Expo Go)'
+                disconnected
+                  ? 'Device disconnected — reconnect to resume'
+                  : connectedDevice
+                    ? (connectedDevice.productName ?? connectedDevice.id) + ' · ' + baudRate + ' baud'
+                    : nativeUsb
+                      ? 'Not connected — tap Connect'
+                      : 'Native USB unavailable (Expo Go)'
               }
             />
 
@@ -185,27 +195,31 @@ export default function BenchScreen() {
               </View>
             )}
 
-            <Row style={{ marginBottom: 8, flexWrap: 'wrap' }}>
+            {disconnected && (
+              <View style={[styles.banner, { backgroundColor: palette.danger + '18', borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger, fontSize: 12 }}>
+                  USB device disconnected. Reconnect the board to resume streaming.
+                </Text>
+              </View>
+            )}
+
+            <Row gap={8} style={{ marginBottom: 8, flexWrap: 'wrap' }}>
               {!connectedDevice ? (
                 <Button title="Connect" onPress={connectSerial} disabled={!nativeUsb} />
               ) : (
                 <Button title="Disconnect" onPress={disconnectSerial} variant="danger" />
               )}
-              <View style={{ width: 8 }} />
               {connectedDevice && (
                 <>
                   <Button title={paused ? 'Resume' : 'Pause'} onPress={() => setPaused((v) => !v)} variant="ghost" />
-                  <View style={{ width: 8 }} />
                   <Button title="Clear" onPress={() => setLines(['> cleared'])} variant="ghost" />
-                  <View style={{ width: 8 }} />
-                  <Button title="Export" onPress={() => {}} variant="ghost" />
+                  <Button title="Export" onPress={exportSerial} variant="ghost" />
                 </>
               )}
             </Row>
 
-            {/* Baud rate selector */}
             {nativeUsb && !connectedDevice && (
-              <Row style={{ marginBottom: 8 }}>
+              <Row gap={4} style={{ marginBottom: 8, flexWrap: 'wrap' }}>
                 <Text style={{ color: palette.textMuted, fontSize: 12, marginRight: 8 }}>Baud:</Text>
                 {BAUD_RATES.map((b) => (
                   <Pressable
@@ -229,18 +243,16 @@ export default function BenchScreen() {
               </ScrollView>
             </Card>
 
-            {/* Send input */}
             {connectedDevice && (
-              <Row style={{ marginTop: 8 }}>
+              <Row gap={8} style={{ marginTop: 8 }}>
                 <TextInput
                   value={inputText}
                   onChangeText={setInputText}
-                  placeholder="Type to send…"
+                  placeholder="Type to send..."
                   placeholderTextColor={palette.textMuted}
                   style={[styles.sendInput, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface }]}
                   onSubmitEditing={sendData}
                 />
-                <View style={{ width: 8 }} />
                 <Button title="Send" onPress={sendData} />
               </Row>
             )}
@@ -251,13 +263,11 @@ export default function BenchScreen() {
           <>
             <SectionTitle title="Serial plotter" subtitle="Numeric values per line, one series per column" />
             <Card style={{ height: 260, padding: 8, backgroundColor: palette.monoBg }}>
-              <WaveformViewer mode="plotter" palette={palette} />
+              <WaveformViewer mode="plotter" palette={palette} dataSource="demo" />
             </Card>
-            <Row style={{ marginTop: 8 }}>
-              <Button title={paused ? 'Resume' : 'Pause'} onPress={() => setPaused((v) => !v)} variant="ghost" />
-              <View style={{ flex: 1 }} />
-              <Button title="Export CSV" onPress={() => {}} variant="ghost" />
-            </Row>
+            <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
+              Plotter currently shows demo data. Wiring to real serial data is planned.
+            </Text>
           </>
         )}
 
@@ -265,30 +275,19 @@ export default function BenchScreen() {
           <>
             <SectionTitle title="Logic analyzer" subtitle="RP2040 capture · zoom · cursors · protocol decode" />
             <Card style={{ height: 260, padding: 8, backgroundColor: palette.monoBg }}>
-              <WaveformViewer mode="logic" palette={palette} />
+              <WaveformViewer mode="logic" palette={palette} dataSource="demo" />
             </Card>
-            <Row style={{ marginTop: 8, flexWrap: 'wrap' }}>
-              <Badge label="UART" tone="accent" />
-              <View style={{ width: 6 }} />
-              <Badge label="I2C" tone="accent" />
-              <View style={{ width: 6 }} />
-              <Badge label="SPI" tone="accent" />
-            </Row>
             <Text style={{ color: palette.warning, fontSize: 12, marginTop: 8 }}>
               Capture requires a verified RP2040 helper firmware image (not bundled). Waveform shows a demo signal.
             </Text>
-            <Row style={{ marginTop: 8 }}>
-              <Button title="Export capture" onPress={() => {}} variant="ghost" />
-            </Row>
           </>
         )}
       </ScrollView>
 
-      {/* Device picker modal for serial connection */}
       <Modal visible={showDevicePicker} animationType="slide" transparent onRequestClose={() => setShowDevicePicker(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
-            <Row style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+            <Row justify="space-between" style={{ marginBottom: 12 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Select serial device</Text>
               <Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
             </Row>
@@ -328,9 +327,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 10 },
   title: { fontSize: 26, fontWeight: '800' },
-  seg: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, marginLeft: 6 },
+  seg: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
   banner: { padding: 10, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
-  baudBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, marginRight: 4 },
+  baudBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
   sendInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'monospace' },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, padding: 20, maxHeight: '70%' },

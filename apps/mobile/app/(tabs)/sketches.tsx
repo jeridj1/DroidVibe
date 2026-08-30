@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Button, Row, SectionTitle } from '@/src/components/ui';
 import { api } from '@/src/lib/api';
 import { setPendingSketch } from '@/src/lib/sketchBridge';
-import { getLocalSketches, saveLocalSketch, deleteLocalSketch, type LocalSketch } from '@/src/lib/offlineSketches';
+import { getLocalSketches, deleteLocalSketch, type LocalSketch } from '@/src/lib/offlineSketches';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SketchItem { id: string; name: string; fqbn: string; port: string | null; updatedAt: number; }
 
@@ -18,68 +19,23 @@ const EXAMPLE_PRESETS = [
 ];
 
 const EXAMPLE_CODE: Record<string, string> = {
-  blink: `// DroidVibe — Blink
-void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-}
-
-void loop() {
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(1000);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(1000);
-}
-`,
-  'serial-test': `// DroidVibe — Serial Test
-void setup() {
-  Serial.begin(9600);
-  Serial.println("DroidVibe Serial Test");
-}
-
-void loop() {
-  Serial.print("uptime_ms=");
-  Serial.println(millis());
-  delay(500);
-}
-`,
-  'analog-read': `// DroidVibe — Analog Read
-void setup() {
-  Serial.begin(9600);
-}
-
-void loop() {
-  int val = analogRead(A0);
-  Serial.print("A0=");
-  Serial.println(val);
-  delay(100);
-}
-`,
-  'pico-blink': `// DroidVibe — Pico Blink (RP2040)
-// Built-in LED is GP25 on Raspberry Pi Pico
-void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-}
-
-void loop() {
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(500);
-}
-`,
+  blink: '// DroidVibe \u2014 Blink\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(1000);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(1000);\n}\n',
+  'serial-test': '// DroidVibe \u2014 Serial Test\nvoid setup() {\n  Serial.begin(9600);\n  Serial.println("DroidVibe Serial Test");\n}\n\nvoid loop() {\n  Serial.print("uptime_ms=");\n  Serial.println(millis());\n  delay(500);\n}\n',
+  'analog-read': '// DroidVibe \u2014 Analog Read\nvoid setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int val = analogRead(A0);\n  Serial.print("A0=");\n  Serial.println(val);\n  delay(100);\n}\n',
+  'pico-blink': '// DroidVibe \u2014 Pico Blink (RP2040)\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(500);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(500);\n}\n',
 };
 
-const BLANK_CODE = `// New Sketch
-void setup() {
-  // put your setup code here, to run once:
+const BLANK_CODE = '// New Sketch\nvoid setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n';
 
+const RECENTS_KEY = '@droidvibe/recents';
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return Math.floor(diff / 86400000) + 'd ago';
 }
-
-void loop() {
-  // put your main code here, to run repeatedly:
-
-}
-`;
 
 export default function SketchesScreen() {
   const { palette } = useTheme();
@@ -88,6 +44,7 @@ export default function SketchesScreen() {
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [localSketches, setLocalSketches] = useState<LocalSketch[]>([]);
+  const [recents, setRecents] = useState<{ name: string; code: string; openedAt: number }[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -99,28 +56,41 @@ export default function SketchesScreen() {
     return () => { active = false; };
   }, []);
 
-  // Load local sketches
   useEffect(() => {
     getLocalSketches().then(setLocalSketches);
+    AsyncStorage.getItem(RECENTS_KEY).then((raw) => {
+      if (raw) setRecents(JSON.parse(raw).slice(0, 5));
+    });
   }, []);
 
   function openExample(id: string, name: string) {
     const code = EXAMPLE_CODE[id] ?? '';
     setPendingSketch(code, name);
+    addRecent(name, code);
     router.push('/editor');
   }
 
   function newSketch() {
     setPendingSketch(BLANK_CODE, 'New Sketch');
+    addRecent('New Sketch', BLANK_CODE);
     router.push('/editor');
+  }
+
+  async function addRecent(name: string, code: string) {
+    const newRecent = { name, code, openedAt: Date.now() };
+    const updated = [newRecent, ...recents.filter((r) => r.name !== name)].slice(0, 5);
+    setRecents(updated);
+    AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated)).catch(() => {});
   }
 
   async function openLocalSketch(sketch: LocalSketch) {
     setPendingSketch(sketch.code, sketch.name);
+    addRecent(sketch.name, sketch.code);
     router.push('/editor');
   }
 
   async function deleteSketch(id: string) {
+    const { Alert } = require('react-native');
     Alert.alert(
       'Delete sketch',
       'This will permanently delete the local sketch. Continue?',
@@ -144,15 +114,35 @@ export default function SketchesScreen() {
         <View>
           <Text style={[styles.title, { color: palette.text }]}>Sketches</Text>
           <Text style={{ color: palette.textMuted, fontSize: 13 }}>
-            Cloud projects · local · examples
+            Cloud · local · examples
           </Text>
         </View>
-        <Button title="New" onPress={newSketch} />
+        <Button title="+ New Sketch" onPress={newSketch} size="lg" />
       </View>
 
       <FlatList
         ListHeaderComponent={
           <>
+            {recents.length > 0 && (
+              <>
+                <SectionTitle title="Recent" subtitle="Recently opened sketches" />
+                {recents.map((r, i) => (
+                  <Card key={i} style={{ marginBottom: 8 }}>
+                    <Pressable onPress={() => { setPendingSketch(r.code, r.name); router.push('/editor'); }}>
+                      <Row justify="space-between">
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 }}>{r.name}</Text>
+                          <Text style={{ color: palette.textMuted, fontSize: 11 }}>{timeAgo(r.openedAt)}</Text>
+                        </View>
+                        <Badge label="recent" tone="accent" />
+                      </Row>
+                    </Pressable>
+                  </Card>
+                ))}
+                <View style={{ height: 16 }} />
+              </>
+            )}
+
             <SectionTitle title="Start from an example" subtitle="Curated starter sketches" />
             <FlatList
               horizontal
@@ -181,12 +171,12 @@ export default function SketchesScreen() {
             {localSketches.map((sketch) => (
               <Card key={sketch.id} style={{ marginBottom: 10 }}>
                 <Pressable onPress={() => openLocalSketch(sketch)} onLongPress={() => deleteSketch(sketch.id)}>
-                  <Row style={{ justifyContent: 'space-between' }}>
+                  <Row justify="space-between">
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{sketch.name}</Text>
-                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn}</Text>
+                      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn} · {timeAgo(sketch.updatedAt)}</Text>
                     </View>
-                    <Badge label="local" tone="neutral" />
+                    <Badge label="local" tone="neutral" dot />
                   </Row>
                 </Pressable>
               </Card>
@@ -203,10 +193,10 @@ export default function SketchesScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
         renderItem={({ item }) => (
           <Card style={{ marginBottom: 10 }}>
-            <Row style={{ justifyContent: 'space-between' }}>
+            <Row justify="space-between">
               <View style={{ flex: 1 }}>
                 <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{item.name}</Text>
-                <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn}</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 12 }}>{item.fqbn} · {timeAgo(item.updatedAt)}</Text>
               </View>
               <Badge label={item.port ? item.port : 'no port'} tone="neutral" />
             </Row>
