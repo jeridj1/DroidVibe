@@ -659,7 +659,7 @@ export default function EditorScreen() {
           {aiResult !== null && (
             <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.success }}>
               <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AITABT</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI GENERATED CODE</Text>
                 <Button
                   title="Insert into editor"
                   onPress={() => {
@@ -839,6 +839,6 @@ const styles = StyleSheet.create({
   bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
   deviceItem: { paddingVertical: 10, borderBottomWidth: 0.5 },
   findInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14 },
-  modalContent: { borderradius: 14, padding: 16, borderWidth: 1, margin: 16 },
+  modalContent: { borderRadius: 14, padding: 16, borderWidth: 1, margin: 16 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
 });
