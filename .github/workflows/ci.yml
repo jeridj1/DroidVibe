@@ -38,7 +38,6 @@ jobs:
           tsc_exit=$?
           cat /tmp/tsc-output.txt
           if [ $tsc_exit -ne 0 ]; then
-            # Also run tsc directly in apps/mobile for cleaner error output
             echo "=== Direct tsc output for apps/mobile ===" >> /tmp/tsc-output.txt
             cd apps/mobile && npx tsc -p tsconfig.json --noEmit 2>&1 >> /tmp/tsc-output.txt
             cd ../..
@@ -180,13 +179,13 @@ jobs:
         if: always()
         with:
           name: prebuild-apk-log
-          path: apps/mobile/prebuild-pak.log
+          path: apps/mobile/prebuild-apk.log
       - name: Debug prebuild output
         working-directory: apps/mobile
         if: always()
         run: |
           echo "=== Checking if config plugins ran ==="
-          echo "--- prebuild-pak.log (plugin-related lines) ---"
+          echo "--- prebuild-apk.log (plugin-related lines) ---"
           grep -i "plugin\|config\|buildConfig\|withApp\|withGradle\|error\|warn" prebuild-apk.log | head -30 || echo "No matching lines found"
           echo "--- gradle.properties (checking for -Xmx3g from plugin) ---"
           grep 'org.gradle.jvmargs' android/gradle.properties 2>/dev/null || echo "gradle.properties not found"
@@ -307,7 +306,13 @@ jobs:
           echo "Commit: ${{ github.sha }}" >> /tmp/issue.md
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue.md
           echo "" >> /tmp/issue.md
-          echo "## Kotlin Compiler Errors" >> /tmp/issuKYXڛȉߟȏݛ\ڜܝYKYܙ\QHN\˛[ؚ[K؛ڙٜYKXZ[وXYNݛ\ڜܝYKYٙ]۝[XڛȈșN[\șݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYXڛȈݛ\ڜܝYKYXڛȈȈژ]ٛܛۙȈݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYܙ\QHژ]ٛܛۙߑRSTN\܎\˛[ؚ[K؛ڙٜYKXZ[وPHLXYLLݛ\ڜܝYKYٙ]۝[XڛȈș\܈[\șݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYXڛȈݛ\ڜܝYKYXڛȈȈܘYKܙ\Y\Ȉݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKY؝\˛[ؚ[K؛ڙٜYKܙ\Y\ȏݛ\ڜܝYKYٙ]۝[XڛȈ[H݈ݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYXڛȈݛ\ڜܝYKYXڛȈȈ\؝Z[ܘYH
-Z[ۛYȊț[Y\ܘXيHݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYܙ\[	؝Z[ۛYן[Y\ܘXٗZ[X]\\Ɉ\˛[ؚ[K؛ڙ؜؝Z[ܘYHݛ\ڜܝYKYٙ]۝[XڛȈ݈ݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYXڛȈݛ\ڜܝYKYXڛȈȈZ[ܘYH
-ՙ\ڛۊHݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYܙ\[ՙ\ڛۈ\˛[ؚ[K؛ڙ؝Z[ܘYHݛ\ڜܝYKYٙ]۝[XڛȈ݈ݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYXڛȈݛ\ڜܝYKYXڛȈȈȝ\ڛۜȚ[ݘ[Yݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYȉГґғӑ_Kۙˈٙ]۝[XڛȈȓșݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYXڛȈݛ\ڜܝYKYXڛȈȈܘYHZ[و
-\݈̌[\ʈݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYZ[Ľ\˛[ؚ[K؛ڙٜYKXZ[وݛ\ڜܝYKYٙ]۝[XڛȈȘZ[وݛݛ\ڜܝYKYXڛȉߟȏݛ\ڜܝYKYڈ\ܝYHܙX]HK]]HҎTȘZ[Z[YKXٞKY[Hݛ\ڜܝYKYYB
+          echo "## Kotlin Compiler Errors" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          grep -E "^e: " apps/mobile/android/gradle-build.log | head -80 >> /tmp/issue.md 2>/dev/null || echo "No e: lines found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          echo "" >> /tmp/issue.md
+          echo "## What went wrong" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          grep -E "What went wrong|FAILURE:|error:" apps/mobile/android/gradle-build.log -A 10 | head -100 >> /tmp/issue.md 2>/dev/null || echo "No error lines found" >> /tmp/issue.md
+          echo '~~~' >> /tmp/issue.md
+          gh issue create --title "CI: APK build failed (${{ github.sha }})" --body-file /tmp/issue.md || true
