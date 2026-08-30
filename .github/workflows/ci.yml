@@ -30,15 +30,28 @@ jobs:
           node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - name: Typecheck
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           pnpm typecheck 2>&1 | tee /tmp/tsc-output.txt
           tsc_exit=${PIPESTATUS[0]}
           if [ $tsc_exit -ne 0 ]; then
-            echo "## TypeScript Errors" >> $GITHUB_STEP_SUMMARY
+            echo "## Full Typecheck Output" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            grep ': error TS' /tmp/tsc-output.txt >> $GITHUB_STEP_SUMMARY || true
+            cat /tmp/tsc-output.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            # Create issue with full output for debugging
+            {
+              echo "## Full Typecheck Output"
+              echo ""
+              echo "Commit: ${{ github.sha }}"
+              echo ""
+              echo '```'
+              cat /tmp/tsc-output.txt
+              echo '```'
+            } > /tmp/tc-issue.md
+            gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
             exit 1
           fi
       - run: pnpm lint
@@ -82,7 +95,8 @@ jobs:
 
   mobile-prebuild:
     name: Expo Prebuild Validation
-    runs-on: ubuntu-latest
+    ru
+ns-on: ubuntu-latest
     timeout-minutes: 25
     needs: quality
     env:
@@ -143,7 +157,8 @@ jobs:
             apps/mobile/android/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
-      - run: pnpm install --no-frozen-lockfile
+    
+  - run: pnpm install --no-frozen-lockfile
       - name: SDK licenses
         run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
       - name: Install SDK components
@@ -178,7 +193,8 @@ jobs:
           if [ -f gradle.properties ]; then
             if grep -q 'android.kotlinVersion=' gradle.properties; then
               sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties
-            else
+    
+        else
               echo "android.kotlinVersion=1.9.25" >> gradle.properties
             fi
           else
@@ -216,7 +232,8 @@ jobs:
             # Enable buildConfig = true (AGP 8.x disables it by default, but prebuild-generated
             # Kotlin code references BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
             if grep -q 'buildConfig = false' app/build.gradle; then
-              sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
+             
+ sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
               echo "Replaced buildConfig = false -> true"
             elif grep -q 'buildConfig = true' app/build.gradle; then
               echo "buildConfig = true already set"
@@ -250,7 +267,8 @@ jobs:
           grep ndkVersion build.gradle || echo "ndkVersion not found in build.gradle"
           echo "=== NDK versions installed ==="
           ls ${ANDROID_HOME}/ndk/ 2>/dev/null || echo "No NDK found"
-      - name: Build debug APK
+   
+   - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set -o pipefail
@@ -294,6 +312,7 @@ jobs:
           grep -E "^e: " apps/mobile/android/gradle-build.log | head -80 >> /tmp/issue.md 2>/dev/null || echo "No e: lines found" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           echo "" >> /tmp/issue.md
+
           echo "## What went wrong" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           grep -E "What went wrong|FAILURE:|error:" apps/mobile/android/gradle-build.log -A 10 | head -100 >> /tmp/issue.md 2>/dev/null || echo "No error lines found" >> /tmp/issue.md
@@ -324,4 +343,3 @@ jobs:
           tail -300 apps/mobile/android/gradle-build.log >> /tmp/issue.md 2>/dev/null || echo "No build log found" >> /tmp/issue.md
           echo '~~~' >> /tmp/issue.md
           gh issue create --title "CI: APK build failed" --body-file /tmp/issue.md || true
-zw(v)àm«ë
