@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Row, SectionTitle, Button, Switch, Divider } from '@/src/components/ui';
+import { isNativeUsbAvailable } from '@/src/lib/transport';
 import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
@@ -46,7 +47,8 @@ export default function SettingsScreen() {
                 onPress={() => setMode(t)}
                 style={[styles.seg, { backgroundColor: mode === t ? palette.accent : palette.bgInset }]}
               >
-                <Text style={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
+                <Text style={{ color: mode === t ? palette.textOnAccent : palette.text
+Muted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
               </Pressable>
             ))}
           </Row>
@@ -86,7 +88,8 @@ export default function SettingsScreen() {
       <Card style={{ marginBottom: 12 }}>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Native USB module</Text>
-          <Badge label={require('@/src/lib/transport').isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={require('@/src/lib/transport').isNativeUsbAvailable() ? 'success' : 'warn'} />
+          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'war
+n'} />
         </Row>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>App version</Text>
@@ -129,7 +132,8 @@ export default function SettingsScreen() {
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>Stack</Text>
-          <Text style={{ color: palette.text }}>Expo · Hono · Turso</Text>
+          <T
+ext style={{ color: palette.text }}>Expo · Hono · Turso</Text>
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>USB protocols</Text>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
@@ -22,7 +22,8 @@ const EXAMPLE_CODE: Record<string, string> = {
   blink: '// DroidVibe \u2014 Blink\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(1000);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(1000);\n}\n',
   'serial-test': '// DroidVibe \u2014 Serial Test\nvoid setup() {\n  Serial.begin(9600);\n  Serial.println("DroidVibe Serial Test");\n}\n\nvoid loop() {\n  Serial.print("uptime_ms=");\n  Serial.println(millis());\n  delay(500);\n}\n',
   'analog-read': '// DroidVibe \u2014 Analog Read\nvoid setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int val = analogRead(A0);\n  Serial.print("A0=");\n  Serial.println(val);\n  delay(100);\n}\n',
-  'pico-blink': '// DroidVibe \u2014 Pico Blink (RP2040)\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(500);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(500);\n}\n',
+  'pico-blink': '// DroidVibe \u2014 Pico Blink (RP2040)\nvoid setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite
+(LED_BUILTIN, HIGH);\n  delay(500);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(500);\n}\n',
 };
 
 const BLANK_CODE = '// New Sketch\nvoid setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n';
@@ -77,7 +78,8 @@ export default function SketchesScreen() {
   }
 
   async function addRecent(name: string, code: string) {
-    const newRecent = { name, code, openedAt: Date.now() };
+    const newRecent = { name
+, code, openedAt: Date.now() };
     const updated = [newRecent, ...recents.filter((r) => r.name !== name)].slice(0, 5);
     setRecents(updated);
     AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated)).catch(() => {});
@@ -90,7 +92,6 @@ export default function SketchesScreen() {
   }
 
   async function deleteSketch(id: string) {
-    const { Alert } = require('react-native');
     Alert.alert(
       'Delete sketch',
       'This will permanently delete the local sketch. Continue?',
@@ -133,7 +134,8 @@ export default function SketchesScreen() {
                 {recents.map((r, i) => (
                   <Card key={i} style={{ marginBottom: 8 }}>
                     <Pressable onPress={() => { setPendingSketch(r.code, r.name); router.push('/editor'); }}>
-                      <Row justify="space-between">
+                      
+<Row justify="space-between">
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 }}>{r.name}</Text>
                           <Text style={{ color: palette.textMuted, fontSize: 11 }}>{timeAgo(r.openedAt)}</Text>
@@ -175,7 +177,8 @@ export default function SketchesScreen() {
             {localSketches.map((sketch) => (
               <Card key={sketch.id} style={{ marginBottom: 10 }}>
                 <Pressable onPress={() => openLocalSketch(sketch)} onLongPress={() => deleteSketch(sketch.id)}>
-                  <Row justify="space-between">
+                  <Row 
+justify="space-between">
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{sketch.name}</Text>
                       <Text style={{ color: palette.textMuted, fontSize: 12 }}>{sketch.fqbn} · {timeAgo(sketch.updatedAt)}</Text>
@@ -219,6 +222,7 @@ export default function SketchesScreen() {
         )}
       />
     </View>
+
   );
 }
 

@@ -38,6 +38,7 @@ jobs:
           tsc_exit=$?
           cat /tmp/tsc-output.txt
           if [ $tsc_exit -ne 0 ]; then
+            # Also run tsc directly in apps/mobile for cleaner error output
             echo "=== Direct tsc output for apps/mobile ===" >> /tmp/tsc-output.txt
             cd apps/mobile && npx tsc -p tsconfig.json --noEmit 2>&1 >> /tmp/tsc-output.txt
             cd ../..
@@ -257,7 +258,8 @@ jobs:
             fi
             echo "--- app/build.gradle AFTER patching ---"
             cat app/build.gradle
-            echo "----------------------------------------"
+            echo "-------
+---------------------------------"
           else
             echo "ERROR: app/build.gradle not found!"
           fi
@@ -307,12 +309,8 @@ jobs:
           echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue.md
           echo "" >> /tmp/issue.md
           echo "## Kotlin Compiler Errors" >> /tmp/issue.md
-          echo '~~~' >> /tmp/issue.md
-          grep -E "^e: " apps/mobile/android/gradle-build.log | head -80 >> /tmp/issue.md 2>/dev/null || echo "No e: lines found" >> /tmp/issue.md
-          echo '~~~' >> /tmp/issue.md
+          grep -E "^e: |error:" gradle-build.log | head -50 >> /tmp/issue.md || true
           echo "" >> /tmp/issue.md
-          echo "## What went wrong" >> /tmp/issue.md
-          echo '~~~' >> /tmp/issue.md
-          grep -E "What went wrong|FAILURE:|error:" apps/mobile/android/gradle-build.log -A 10 | head -100 >> /tmp/issue.md 2>/dev/null || echo "No error lines found" >> /tmp/issue.md
-          echo '~~~' >> /tmp/issue.md
-          gh issue create --title "CI: APK build failed (${{ github.sha }})" --body-file /tmp/issue.md || true
+          echo "## Gradle Build Log (last 80 lines)" >> /tmp/issue.md
+          tail -80 gradle-build.log >> /tmp/issue.md
+          gh issue create --title "CI: APK build failed" --body-file /tmp/issue.md || true
