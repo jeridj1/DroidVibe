@@ -3,6 +3,8 @@ import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { light, dark, type Palette } from './colors';
 
+export type { Palette } from './colors';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeCtx {
