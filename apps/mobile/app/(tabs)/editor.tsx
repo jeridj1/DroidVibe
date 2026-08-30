@@ -659,7 +659,7 @@ export default function EditorScreen() {
           {aiResult !== null && (
             <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.success }}>
               <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI GENERATED CODE</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AITABT</Text>
                 <Button
                   title="Insert into editor"
                   onPress={() => {
@@ -706,7 +706,7 @@ export default function EditorScreen() {
                         <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
                           {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
-                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? 'â'} Â· VID {item.vendorId} PID {item.productId}
+                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
                         </Text>
                       </View>                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
                     </Row>                    {id && (
@@ -726,8 +726,7 @@ export default function EditorScreen() {
       </Modal>
 
       {/* Find & Replace modal */}
-      <Modal visible={showFind} animationType="slide
-" transparent onRequestClose={() => setShowFind(false)}>
+      <Modal visible={showFind} animationType="slide" transparent onRequestClose={() => setShowFind(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
             <Row justify="space-between" style={{ marginBottom: 12 }}>
@@ -840,7 +839,6 @@ const styles = StyleSheet.create({
   bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
   deviceItem: { paddingVertical: 10, borderBottomWidth: 0.5 },
   findInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14 },
-  modalContent: { borderRadius: 14, padding: 16, borderWidth: 1, margin: 16 },
+  modalContent: { borderradius: 14, padding: 16, borderWidth: 1, margin: 16 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
 });
-
