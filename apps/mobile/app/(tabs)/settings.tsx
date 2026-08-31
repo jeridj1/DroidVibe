@@ -1,15 +1,53 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Linking, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Row, SectionTitle, Button, Switch, Divider } from '@/src/components/ui';
 import { isNativeUsbAvailable } from '@/src/lib/transport';
+import { getApiUrl, setApiUrl as saveApiUrl, getAiModel, setAiModel as saveAiModel, getAiKey, setAiKey as saveAiKey, DEFAULT_AI_MODEL } from '@/src/lib/appConfig';
+import { invalidateApiBaseCache } from '@/src/lib/api';
 import Constants from 'expo-constants';
+
+const AI_MODELS = [
+  'mistral-large-latest',
+  'mistral-medium-latest',
+  'mistral-small-latest',
+  'open-mistral-nemo',
+  'open-mixtral-8x7b',
+];
 
 export default function SettingsScreen() {
   const { palette, mode, setMode, textScale, setTextScale, twoPane, setTwoPane } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const [backendUrl, setBackendUrl] = useState('');
+  const [aiModel, setAiModel] = useState(DEFAULT_AI_MODEL);
+  const [aiKey, setAiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setBackendUrl((await getApiUrl()) ?? '');
+      const m = await getAiModel();
+      if (m) setAiModel(m);
+      setAiKey((await getAiKey()) ?? '');
+    })();
+  }, []);
+
+  function persistBackendUrl(v: string) {
+    setBackendUrl(v);
+    saveApiUrl(v);
+    invalidateApiBaseCache();
+  }
+  function persistAiModel(v: string) {
+    setAiModel(v);
+    saveAiModel(v);
+  }
+  function persistAiKey(v: string) {
+    setAiKey(v);
+    saveAiKey(v);
+  }
 
   const themeOptions: ThemeMode[] = ['light', 'dark', 'system'];
   const version = Constants.expoConfig?.version ?? '1.0.0';
@@ -47,7 +85,8 @@ export default function SettingsScreen() {
                 onPress={() => setMode(t)}
                 style={[styles.seg, { backgroundColor: mode === t ? palette.accent : palette.bgInset }]}
               >
-                <Text style={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
+                <Text styl
+e={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
               </Pressable>
             ))}
           </Row>
@@ -81,13 +120,68 @@ export default function SettingsScreen() {
           </View>
           <Badge label="local only" tone="neutral" />
         </Row>
+        <Divider />
+        <Button
+          title="Sign in"
+          onPress={() => Alert.alert('Sign in', 'Cloud sign-in is coming soon.')}
+          variant="ghost"
+        />
+      </Card>
+
+      <SectionTitle title="AI & Backend" subtitle="Mistral AI model & server URL" />
+      <Card style={{ marginBottom: 12 }}>
+        <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
+        <TextInput
+          value={backendUrl}
+          onChangeText={persistBackendUrl}
+          placeholder="http://192.168.1.10:3001"
+          placeholderTextColor={palette.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={[styles.input, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface }]}
+        />
+        <Divider />
+        <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>AI model</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {AI_MODELS.map((m) => (
+            <Pressable
+              key={m}
+              onPress={() => persistAiModel(m)}
+              style={[styles.seg, { backgroundColor: aiModel === m ? palette.accent : palette.bgInset }]}
+            >
+              <Text style={{ color: aiModel === m ? palette.textOnAccent : palette.textMuted, fontSize: 11, fontWeight: '700' }}>{m}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Divider />
+        <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Mistral API key</Text>
+        <Row style={{ alignItems: 'center' }}>
+          <TextInput
+            value={aiKey}
+            onChangeText={persistAiKey}
+            placeholder="sk-..."
+            placeholderTextColor={palette.textMuted}
+            secureTextEntry={!showKey}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.input, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface, flex: 1 }]}
+          />
+          <Pressable onPress={() => setShowKey((v) => !v)} style={{ marginLeft: 8 }}>
+            <Text style={{ color: palette.accent, fontWeight: '700' }}>{showKey ? 'Hide' : 'Show'}</Text>
+          </Pressable>
+        </Row>
+        <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>
+          Stored locally on-device. Used for AI explain / fix / generate features.
+        </Text>
       </Card>
 
       <SectionTitle title="Diagnostics" subtitle="System health checks" />
       <Card style={{ marginBottom: 12 }}>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Native USB module</Text>
-          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'} />
+          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'
+} />
         </Row>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>App version</Text>
@@ -130,11 +224,12 @@ export default function SettingsScreen() {
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>Stack</Text>
-          <Text style={{ color: palette.text }}>Expo Â· Hono Â· Turso</Text>
+          <Tex
+t style={{ color: palette.text }}>Expo · Hono · Turso</Text>
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>USB protocols</Text>
-          <Text style={{ color: palette.text }}>STK500 Â· AVR109 Â· ESP Â· PICOBOOT</Text>
+          <Text style={{ color: palette.text }}>STK500 · AVR109 · ESP · PICOBOOT</Text>
         </Row>
       </Card>
 
@@ -148,4 +243,5 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   seg: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
 });

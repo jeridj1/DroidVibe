@@ -4,14 +4,44 @@
  * unreachable so the UI can show an explicit offline state (never fake success).
  */
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE =
+const DEFAULT_BASE =
   ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
     'http://localhost:3001');
 
-async function rpc<T>(path: string, input: unknown): Promise<T> {
+const API_URL_KEY = '@droidvibe/api_url';
+
+let apiBaseCache: string = DEFAULT_BASE;
+let apiBaseReady = false;
+
+/** Sync getter for the currently resolved backend base URL. */
+export function getApiBase(): string {
+  return apiBaseCache;
+}
+
+/** Re-read the user-configured backend URL from AsyncStorage and refresh the cache. */
+export async function invalidateApiBaseCache(): Promise<void> {
   try {
-    const res = await fetch(BASE + '/rpc/' + path, {
+    const stored = await AsyncStorage.getItem(API_URL_KEY);
+    apiBaseCache = stored && stored.trim() ? stored : DEFAULT_BASE;
+  } catch {
+    apiBaseCache = DEFAULT_BASE;
+  }
+  apiBaseReady = true;
+}
+
+async function ensureApiBase(): Promise<void> {
+  if (!apiBaseReady) await invalidateApiBaseCache();
+}
+
+// Best-effort initial resolution on module load.
+invalidateApiBaseCache().catch(() => { /* ignore */ });
+
+async function rpc<T>(path: string, input: unknown): Promise<T> {
+  await ensureApiBase();
+  try {
+    const res = await fetch(getApiBase() + '/rpc/' + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: input ? JSON.stringify(input) : '{}',
