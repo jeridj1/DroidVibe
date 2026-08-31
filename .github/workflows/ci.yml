@@ -236,8 +236,11 @@ jobs:
           # Install react-native CLI (not included by default in Expo projects)
           pnpm add -D @react-native-community/cli@latest 2>&1 | tee /tmp/bundle-output.txt
           
-          # Create a temporary entry file for expo-router
-          echo "import 'expo-router/entry';" > index.js
+          # Resolve the actual expo-router entry file to an absolute path.
+          # Metro's projectRoot is the monorepo root (set by Expo's getDefaultConfig),
+          # so relative entry-file paths resolve there, not in apps/mobile/.
+          ENTRY_FILE=$(node -e "console.log(require.resolve('expo-router/entry'))")
+          echo "Resolved entry file: $ENTRY_FILE" 2>&1 | tee -a /tmp/bundle-output.txt
           
           # Create assets directory for the JS bundle
           mkdir -p android/app/src/main/assets
@@ -247,15 +250,12 @@ jobs:
           pnpm exec react-native bundle \
             --platform android \
             --dev false \
-            --entry-file index.js \
+            --entry-file "$ENTRY_FILE" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res/ \
             --max-workers 2 \
             --verbose 2>&1 | tee -a /tmp/bundle-output.txt
           bundle_exit=${PIPESTATUS[0]}
-          
-          # Clean up temporary entry file
-          rm -f index.js
           
           if [ $bundle_exit -ne 0 ]; then
             echo "=== react-native bundle failed (exit $bundle_exit) ===" 2>&1 | tee -a /tmp/bundle-output.txt
