@@ -233,6 +233,15 @@ jobs:
       - name: Bundle JavaScript
         working-directory: apps/mobile
         run: |
+          # Debug: check available CLIs
+          echo "=== Checking available tools ==="
+          pnpm exec react-native --version 2>&1 || echo "react-native CLI not available"
+          ls node_modules/.bin/react-native 2>/dev/null || echo "No react-native bin symlink"
+          ls node_modules/react-native/cli.js 2>/dev/null || echo "No react-native cli.js"
+          ls node_modules/.bin/metro 2>/dev/null || echo "No metro bin"
+          ls node_modules/expo/cli.js 2>/dev/null || echo "No expo cli.js"
+          echo ""
+          
           # Create a temporary entry file for expo-router
           echo "import 'expo-router/entry';" > index.js
           
@@ -240,16 +249,67 @@ jobs:
           mkdir -p android/app/src/main/assets
           
           # Bundle the JS using Metro (via react-native CLI)
+          # Capture output for error reporting
           pnpm exec react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res/ \
-            --max-workers 2
+            --max-workers 2 \
+            --verbose 2>&1 | tee /tmp/bundle-output.txt
+          bundle_exit=${PIPESTATUS[0]}
+          
+          if [ $bundle_exit -ne 0 ]; then
+            echo "=== react-native bundle failed (exit $bundle_exit), trying npx fallback ==="
+            npx --yes react-native bundle \
+              --platform android \
+              --dev false \
+              --entry-file index.js \
+              --bundle-output android/app/src/main/assets/index.android.bundle \
+              --assets-dest android/app/src/main/res/ \
+              --max-workers 2 \
+              --verbose 2>&1 | tee -a /tmp/bundle-output.txt
+            bundle_exit=${PIPESTATUS[0]}
+          fi
+          
+          if [ $bundle_exit -ne 0 ]; then
+            echo "=== npx fallback also failed, trying metro directly ==="
+            node -e "
+              const Metro = require('metro');
+              const config = require('./metro.config.js');
+              const yargs = require('yargs');
+              Metro.runMetro({
+                config,
+                resetCache: false,
+              }).then(server => {
+                return server.build({
+                  entryFile: 'index.js',
+                  dev: false,
+                  platform: 'android',
+                  createModuleIdFactory: undefined,
+                });
+              }).then(bundle => {
+                const fs = require('fs');
+                fs.mkdirSync('android/app/src/main/assets', {recursive: true});
+                fs.writeFileSync('android/app/src/main/assets/index.android.bundle', bundle.code);
+                console.log('Bundle created via Metro API');
+                process.exit(0);
+              }).catch(e => {
+                console.error('Metro bundling error:', e);
+                process.exit(1);
+              });
+            " 2>&1 | tee -a /tmp/bundle-output.txt || true
+            bundle_exit=${PIPESTATUS[0]}
+          fi
           
           # Clean up temporary entry file
           rm -f index.js
+          
+          if [ $bundle_exit -ne 0 ]; then
+            echo "=== All bundling approaches failed ==="
+            exit 1
+          fi
           
           echo "=== JS bundle created ==="
           ls -la android/app/src/main/assets/index.android.bundle
@@ -275,6 +335,11 @@ jobs:
             echo "Commit: ${{ github.sha }}"
             echo ""
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "### Bundle Output"
+            echo '~~~'
+            cat /tmp/bundle-output.txt 2>/dev/null || echo "No bundle output captured"
+            echo '~~~'
             echo ""
             echo "### Build Output (last 100 lines)"
             echo '~~~'
