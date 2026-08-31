@@ -1,9 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" fill="#00979D"/>
-  <g transform="translate(512, 512) scale(0.65) translate(-512, -512)">
-    <path d="M340 280 L340 744 L520 744 Q660 744 660 600 L660 424 Q660 280 520 280 Z M420 360 L520 360 Q580 360 580 424 L580 600 Q580 664 520 664 L420 664 Z" fill="#E8F5F3"/>
-    <circle cx="724" cy="280" r="24" fill="#4ADE80"/>
-    <circle cx="724" cy="280" r="14" fill="#22C55E"/>
-    <rect x="180" y="720" width="120" height="80" rx="8" fill="#0A1518" stroke="#E8F5F3" stroke-width="3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00979D"/>
+      <stop offset="1" stop-color="#00565B"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="190" y1="0" x2="834" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00E8E0" stop-opacity="0.3"/>
+      <stop offset="0.2" stop-color="#5CFFE8"/>
+      <stop offset="0.5" stop-color="#FFFFFF"/>
+      <stop offset="0.8" stop-color="#5CFFE8"/>
+      <stop offset="1" stop-color="#00E8E0" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+
+  <!-- Full-bleed background (system applies mask) -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Chip pins - left (scaled for safe zone) -->
+  <g fill="#0A1518">
+    <rect x="286" y="392" width="56" height="12" rx="4"/>
+    <rect x="286" y="440" width="56" height="12" rx="4"/>
+    <rect x="286" y="488" width="56" height="12" rx="4"/>
+    <rect x="286" y="536" width="56" height="12" rx="4"/>
+    <rect x="286" y="584" width="56" height="12" rx="4"/>
+    <rect x="286" y="632" width="56" height="12" rx="4"/>
+    <rect x="682" y="392" width="56" height="12" rx="4"/>
+    <rect x="682" y="440" width="56" height="12" rx="4"/>
+    <rect x="682" y="488" width="56" height="12" rx="4"/>
+    <rect x="682" y="536" width="56" height="12" rx="4"/>
+    <rect x="682" y="584" width="56" height="12" rx="4"/>
+    <rect x="682" y="632" width="56" height="12" rx="4"/>
   </g>
+
+  <!-- Chip body (scaled for safe zone: 342-682) -->
+  <rect x="342" y="342" width="340" height="340" rx="30" fill="#0A1518"/>
+
+  <!-- Chip inner border -->
+  <rect x="366" y="366" width="292" height="292" rx="20" fill="none" stroke="#1a3a3e" stroke-width="2"/>
+
+  <!-- Chip orientation dot -->
+  <circle cx="512" cy="372" r="8" fill="#00979D" opacity="0.5"/>
+
+  <!-- Waveform glow underlay -->
+  <path d="M 190 512 L 420 512 L 438 478 L 456 546 L 472 512 L 485 388 L 506 636 L 522 512 L 538 486 L 556 538 L 572 512 L 834 512"
+    stroke="#5CFFE8" stroke-width="32" fill="none"
+    stroke-linecap="round" stroke-linejoin="round" opacity="0.2" filter="url(#glow)"/>
+
+  <!-- Waveform main -->
+  <path d="M 190 512 L 420 512 L 438 478 L 456 546 L 472 512 L 485 388 L 506 636 L 522 512 L 538 486 L 556 538 L 572 512 L 834 512"
+    stroke="url(#wave)" stroke-width="22" fill="none"
+    stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
