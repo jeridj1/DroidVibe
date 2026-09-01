@@ -6,16 +6,31 @@ import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Row, SectionTitle, Button, Switch, Divider } from '@/src/components/ui';
 import { isNativeUsbAvailable } from '@/src/lib/transport';
 import { invalidateApiBaseCache } from '@/src/lib/api';
-import { getApiUrl, setApiUrl, getAiModel, setAiModel, getAiKey, setAiKey, DEFAULT_AI_MODEL } from '@/src/lib/appConfig';
+import { getApiUrl, setApiUrl, getAiModel, setAiModel, getAiKey, setAiKey, getAiProvider, setAiProvider, DEFAULT_AI_MODEL, DEFAULT_AI_PROVIDER } from '@/src/lib/appConfig';
 import Constants from 'expo-constants';
 
-const AI_MODELS = [
-  'mistral-large-latest',
-  'mistral-medium-latest',
-  'mistral-small-latest',
-  'open-mistral-nemo',
-  'open-codestral-mistral',
-];
+const AI_PROVIDERS = ['mistral', 'openai', 'google'] as const;
+
+const MODELS_BY_PROVIDER: Record<string, string[]> = {
+  mistral: [
+    'mistral-large-latest',
+    'mistral-medium-latest',
+    'mistral-small-latest',
+    'open-mistral-nemo',
+    'open-codestral-mistral',
+  ],
+  openai: [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+    'gpt-3.5-turbo',
+  ],
+  google: [
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+    'gemini-2.0-flash-exp',
+  ],
+};
 
 export default function SettingsScreen() {
   const { palette, mode, setMode, textScale, setTextScale, twoPane, setTwoPane } = useTheme();
@@ -24,12 +39,14 @@ export default function SettingsScreen() {
   const themeOptions: ThemeMode[] = ['light', 'dark', 'system'];
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const [backendUrl, setBackendUrl] = useState('');
+  const [aiProvider, setAiProviderState] = useState<string>(DEFAULT_AI_PROVIDER);
   const [aiModel, setAiModelState] = useState(DEFAULT_AI_MODEL);
   const [aiKey, setAiKeyState] = useState('');
   const [showAiKey, setShowAiKey] = useState(false);
 
   useEffect(() => {
     getApiUrl().then(setBackendUrl);
+    getAiProvider().then(setAiProviderState);
     getAiModel().then(setAiModelState);
     getAiKey().then(setAiKeyState);
   }, []);
@@ -38,6 +55,15 @@ export default function SettingsScreen() {
     setBackendUrl(url);
     await setApiUrl(url);
     invalidateApiBaseCache();
+  }
+
+  async function persistAiProvider(provider: string) {
+    setAiProviderState(provider);
+    await setAiProvider(provider);
+    const models = MODELS_BY_PROVIDER[provider] ?? MODELS_BY_PROVIDER.mistral;
+    const newModel = models[0];
+    setAiModelState(newModel);
+    await setAiModel(newModel);
   }
 
   async function persistAiModel(model: string) {
@@ -63,6 +89,8 @@ export default function SettingsScreen() {
       ]
     );
   }
+
+  const aiModels = MODELS_BY_PROVIDER[aiProvider] ?? MODELS_BY_PROVIDER.mistral;
 
   return (
     <ScrollView
@@ -121,24 +149,26 @@ export default function SettingsScreen() {
         <Button title="Sign in" onPress={() => Alert.alert('Sign in', 'Coming soon!')} variant="ghost" size="sm" />
       </Card>
 
-      <SectionTitle title="AI & Backend" subtitle="Mistral AI configuration" />
+      <SectionTitle title="AI Provider" subtitle="Direct AI — no backend needed with API key" />
       <Card style={{ marginBottom: 12 }}>
         <View style={{ marginBottom: 12 }}>
-          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
-          <TextInput
-            style={styles.input}
-            value={backendUrl}
-            onChangeText={persistBackendUrl}
-            placeholder="http://localhost:3001"
-            placeholderTextColor={palette.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Provider</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {AI_PROVIDERS.map((p) => (
+              <Pressable
+                key={p}
+                onPress={() => persistAiProvider(p)}
+                style={[styles.seg, { backgroundColor: aiProvider === p ? palette.accent : palette.bgInset }]}
+              >
+                <Text style={{ color: aiProvider === p ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{p}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
         <View style={{ marginBottom: 12 }}>
-          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>AI Model</Text>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Model</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {AI_MODELS.map((m) => (
+            {aiModels.map((m) => (
               <Pressable
                 key={m}
                 onPress={() => persistAiModel(m)}
@@ -150,13 +180,13 @@ export default function SettingsScreen() {
           </View>
         </View>
         <View>
-          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Mistral API Key</Text>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>API Key</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
               value={aiKey}
               onChangeText={persistAiKey}
-              placeholder="optional — overrides server key"
+              placeholder="enter key for direct AI access"
               placeholderTextColor={palette.textMuted}
               secureTextEntry={!showAiKey}
               autoCapitalize="none"
@@ -164,6 +194,28 @@ export default function SettingsScreen() {
             />
             <Button title={showAiKey ? 'Hide' : 'Show'} onPress={() => setShowAiKey((v) => !v)} variant="ghost" size="sm" />
           </View>
+          <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>
+            {aiKey ? '✓ AI calls go directly from your phone — no backend needed.' : 'When set, AI features work without a backend server.'}
+          </Text>
+        </View>
+      </Card>
+
+      <SectionTitle title="Backend (optional)" subtitle="Only needed for compilation" />
+      <Card style={{ marginBottom: 12 }}>
+        <View>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
+          <TextInput
+            style={styles.input}
+            value={backendUrl}
+            onChangeText={persistBackendUrl}
+            placeholder="http://192.168.1.100:3001 (optional)"
+            placeholderTextColor={palette.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>
+            Only needed for on-device compilation. AI features work without it when an API key is set above.
+          </Text>
         </View>
       </Card>
 
@@ -172,6 +224,10 @@ export default function SettingsScreen() {
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Native USB module</Text>
           <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'} />
+        </Row>
+        <Row justify="space-between" style={{ marginBottom: 8 }}>
+          <Text style={{ color: palette.text, fontWeight: '600' }}>AI mode</Text>
+          <Text style={{ color: aiKey ? palette.text : palette.textMuted, fontSize: 13 }}>{aiKey ? 'direct (phone)' : 'backend (if running)'}</Text>
         </Row>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>App version</Text>
