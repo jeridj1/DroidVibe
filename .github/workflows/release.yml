@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -105,6 +107,8 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             echo "name=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.ref_name }}" ]; then
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
             echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
