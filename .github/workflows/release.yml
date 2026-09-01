@@ -89,27 +89,15 @@ jobs:
           echo "=== Final gradle.properties ==="
           cat gradle.properties
 
-      - name: Build release APK
+      - name: Build debug APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease --no-daemon --parallel --build-cache
+        run: ./gradlew assembleDebug --no-daemon --parallel --build-cache
 
-      - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign
-        with:
-          releaseDirectory: apps/mobile/android/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
-          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        env:
-          BUILD_TOOLS_VERSION: "35.0.0"
-
-      - name: Upload signed APK artifact
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: droidvibe-release-apk
-          path: ${{ steps.sign.outputs.signedReleaseFile }}
+          name: droidvibe-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
       - name: Determine tag name
@@ -127,8 +115,8 @@ jobs:
           tag_name: ${{ steps.tag.outputs.name }}
           name: DroidVibe ${{ steps.tag.outputs.name }}
           generate_release_notes: true
-          files: ${{ steps.sign.outputs.signedReleaseFile }}
-          prerelease: false
+          files: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
