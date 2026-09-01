@@ -11,7 +11,7 @@ gets flashed via PICOBOOT and communicates with the Android app over USB CDC.
 | Logic Analyzer | logic_analyzer | 8-channel GPIO sampling at up to ~1 MHz |
 | SWD Programmer | swd | Serial Wire Debug for ARM Cortex-M targets |
 | JTAG Programmer | jtag | JTAG TMS/TDI/TDO shifting for various targets |
-| AVR ISP | avr_isp | SPI-based ISP for AVR chips |
+| AVR ISP | avr_isp | SPI-based ISP for AVR chips (STK500v1 compatible) |
 
 ## Building
 
@@ -97,8 +97,10 @@ All firmware communicates with the Android app over USB CDC serial at 115200 bau
 | Exit LA mode | 0x03 | none | ack |
 | Start capture | 0x04 | none | 4-byte sample count + sample data |
 | Stop capture | 0x05 | none | ack |
-| SWD read | 0x10 | 1-byte AP/DP + 4-byte addr | 4-byte data |
-| SWD write | 0x11 | 1-byte AP/DP + 4-byte addr + 4-byte data | ack |
+| SWD write | 0x10 | 1-byte AP/DP + 4-byte addr + 4-byte data | 4-byte ack/status |
+| SWD read | 0x11 | 1-byte AP/DP + 4-byte addr + 4-byte (ignored) data | 4-byte data |
+| JTAG write | 0x20 | (reserved) | ack |
+| JTAG read | 0x21 | (reserved) | ack |
 | JTAG TMS seq | 0x22 | 2-byte bit count + TMS bytes | ack |
 | JTAG TDI/TDO seq | 0x23 | 2-byte bit count + TMS + TDI bytes | TDO bytes |
 
