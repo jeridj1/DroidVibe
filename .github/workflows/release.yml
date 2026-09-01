@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   release-apk:
@@ -118,10 +119,19 @@ jobs:
           fi
           echo "=== Final gradle.properties ==="
           cat gradle.properties
+          echo ""
+          echo "=== settings.gradle (last 15 lines) ==="
+          tail -15 settings.gradle
+          echo ""
+          echo "=== app/build.gradle dependencies ==="
+          grep -A10 "dependencies" app/build.gradle || echo "No dependencies section found"
 
       - name: Build debug APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon --parallel --build-cache
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon --parallel --build-cache 2>&1 | tee /tmp/build-output.log
+          exit ${PIPESTATUS[0]}
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
@@ -157,7 +167,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Release build failed" > /tmp/issue.md
-          echo "Tag: ${{ steps.tag.outputs.name }}" >> /tmp/issue.md
-          echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue.md
-          gh issue create --title "Release build failed (${{ steps.tag.outputs.name }})" --body-file /tmp/issue.md || true
+          TAG="${{ steps.tag.outputs.name || github.ref_name }}"
+          {
+            echo "## Release build failed"
+            echo ""
+            echo "Tag: $TAG"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "### settings.gradle (last 20 lines)"
+            echo '~~~'
+            tail -20 apps/mobile/android/settings.gradle 2>/dev/null || echo "File not found"
+            echo '~~~'
+            echo ""
+            echo "### app/build.gradle dependencies"
+            echo '~~~'
+            grep -A10 'dependencies' apps/mobile/android/app/build.gradle 2>/dev/null || echo "File not found"
+            echo '~~~'
+            echo ""
+            echo "### Build Output (last 200 lines)"
+            echo '~~~'
+            tail -200 /tmp/build-output.log 2>/dev/null || echo "No build output captured"
+            echo '~~~'
+          } > /tmp/issue.md
+          gh issue create --title "Release build failed ($TAG)" --body-file /tmp/issue.md || true
