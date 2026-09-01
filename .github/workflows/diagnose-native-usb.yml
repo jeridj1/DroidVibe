@@ -13,6 +13,10 @@ jobs:
     timeout-minutes: 15
     env:
       EXPO_NO_TELEMETRY: "1"
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -28,48 +32,83 @@ jobs:
 
       - name: Check node_modules for native-usb
         run: |
-          echo "=== Checking node_modules ==="
-          ls -la apps/mobile/node_modules/@droidvibe/ 2>/dev/null || echo "NOT FOUND in apps/mobile/node_modules/@droidvibe/"
-          ls -la node_modules/@droidvibe/ 2>/dev/null || echo "NOT FOUND in node_modules/@droidvibe/"
-          echo ""
-          echo "=== Check if native-usb symlink exists ==="
-          readlink apps/mobile/node_modules/@droidvibe/native-usb 2>/dev/null || echo "No symlink in apps/mobile"
-          readlink node_modules/@droidvibe/native-usb 2>/dev/null || echo "No symlink in root"
-          echo ""
-          echo "=== Check expo-module.config.json ==="
-          cat packages/native-usb/expo-module.config.json
-          echo ""
-          echo "=== Run expo-modules-autolinking search ==="
-          cd apps/mobile
-          pnpm exec expo-modules-autolinking search --platform android 2>&1 || echo "autolinking search failed"
-          echo ""
-          echo "=== Run expo prebuild ==="
-          pnpm exec expo prebuild --platform android --no-install --clean 2>&1 | tee /tmp/prebuild.log
-          echo ""
-          echo "=== Check settings.gradle ==="
-          cat android/settings.gradle 2>/dev/null || echo "settings.gradle not found"
-          echo ""
-          echo "=== Check for native-usb in settings.gradle ==="
-          grep -i "native-usb\|nativeusb\|native_usb" android/settings.gradle 2>/dev/null || echo "NOT FOUND in settings.gradle"
-          echo ""
-          echo "=== Check app/build.gradle ==="
-          cat android/app/build.gradle 2>/dev/null | head -80 || echo "app/build.gradle not found"
-          echo ""
-          echo "=== Check for native-usb in app/build.gradle ==="
-          grep -i "native-usb\|nativeusb\|native_usb" android/app/build.gradle 2>/dev/null || echo "NOT FOUND in app/build.gradle"
-          echo ""
-          echo "=== Check android/build.gradle ==="
-          cat android/build.gradle 2>/dev/null || echo "build.gradle not found"
-          echo ""
-          echo "=== List all gradle projects ==="
-          grep "include" android/settings.gradle 2>/dev/null || echo "No include statements found"
+          {
+            echo "## Native USB Autolinking Diagnostic"
+            echo ""
+            echo "### node_modules structure"
+            echo ""
+            echo "```"
+            echo "=== apps/mobile/node_modules/@droidvibe/ ==="
+            ls -la apps/mobile/node_modules/@droidvibe/ 2>/dev/null || echo "NOT FOUND"
+            echo ""
+            echo "=== root node_modules/@droidvibe/ ==="
+            ls -la node_modules/@droidvibe/ 2>/dev/null || echo "NOT FOUND"
+            echo ""
+            echo "=== symlinks ==="
+            readlink apps/mobile/node_modules/@droidvibe/native-usb 2>/dev/null || echo "No symlink in apps/mobile"
+            readlink node_modules/@droidvibe/native-usb 2>/dev/null || echo "No symlink in root"
+            echo ""
+            echo "=== expo-module.config.json ==="
+            cat packages/native-usb/expo-module.config.json
+            echo "```"
+            echo ""
+            echo "### expo-modules-autolinking search"
+            echo ""
+            echo "```"
+            cd apps/mobile
+            pnpm exec expo-modules-autolinking search --platform android 2>&1 || echo "autolinking search failed"
+            echo "```"
+            echo ""
+            echo "### expo prebuild output"
+            echo ""
+            echo "```"
+            pnpm exec expo prebuild --platform android --no-install --clean 2>&1
+            echo "```"
+            echo ""
+            echo "### settings.gradle"
+            echo ""
+            echo "```gradle"
+            cat android/settings.gradle 2>/dev/null || echo "settings.gradle not found"
+            echo "```"
+            echo ""
+            echo "### native-usb in settings.gradle?"
+            echo ""
+            grep -i "native-usb\|nativeusb\|native_usb" android/settings.gradle 2>/dev/null && echo "FOUND in settings.gradle" || echo "NOT FOUND in settings.gradle"
+            echo ""
+            echo "### app/build.gradle (first 80 lines)"
+            echo ""
+            echo "```gradle"
+            cat android/app/build.gradle 2>/dev/null | head -80 || echo "app/build.gradle not found"
+            echo "```"
+            echo ""
+            echo "### native-usb in app/build.gradle?"
+            echo ""
+            grep -i "native-usb\|nativeusb\|native_usb" android/app/build.gradle 2>/dev/null && echo "FOUND in app/build.gradle" || echo "NOT FOUND in app/build.gradle"
+            echo ""
+            echo "### root build.gradle"
+            echo ""
+            echo "```gradle"
+            cat android/build.gradle 2>/dev/null || echo "build.gradle not found"
+            echo "```"
+            echo ""
+            echo "### All include statements in settings.gradle"
+            echo ""
+            echo "```"
+            grep "include" android/settings.gradle 2>/dev/null || echo "No include statements found"
+            echo "```"
+          } > /tmp/diagnostic.md
+
+      - name: Create issue with results
+        if: always()
+        run: |
+          gh issue create --title "Native USB Autolinking Diagnostic Results" --body-file /tmp/diagnostic.md || true
 
       - name: Upload diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: native-usb-diagnostics
           path: |
-            /tmp/prebuild.log
+            /tmp/diagnostic.md
             apps/mobile/android/settings.gradle
             apps/mobile/android/app/build.gradle
             apps/mobile/android/build.gradle
