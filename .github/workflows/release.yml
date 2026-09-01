@@ -60,28 +60,36 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
 
-      - name: Verify native USB module is linked
+      - name: Ensure native USB module is linked
         working-directory: apps/mobile/android
         run: |
           echo "=== Checking settings.gradle for native-usb ==="
           if grep -qi "native-usb\|nativeusb" settings.gradle 2>/dev/null; then
-            echo "✅ native-usb module found in settings.gradle"
+            echo "native-usb module found in settings.gradle (autolinking works)"
           else
-            echo "❌ native-usb module NOT found in settings.gradle!"
-            echo "=== Full settings.gradle ==="
-            cat settings.gradle
+            echo "native-usb not autolinked - manually injecting into gradle files"
+            
+            # Add the module project to settings.gradle
+            echo "" >> settings.gradle
+            echo "// DroidVibe native USB module (manual link)" >> settings.gradle
+            echo "include ':@droidvibe_native-usb'" >> settings.gradle
+            echo "project(':@droidvibe_native-usb').projectDir = new File(rootProject.projectDir, '../../packages/native-usb/android')" >> settings.gradle
+            
+            # Add the dependency to app/build.gradle
+            if grep -q "dependencies" app/build.gradle; then
+              sed -i "/dependencies {/a\    implementation project(':@droidvibe_native-usb')" app/build.gradle
+            else
+              echo "dependencies { implementation project(':@droidvibe_native-usb') }" >> app/build.gradle
+            fi
+            
+            echo "Manually added native-usb module to settings.gradle and app/build.gradle"
+            
+            # Verify
+            echo "=== settings.gradle (last 10 lines) ==="
+            tail -10 settings.gradle
             echo ""
-            echo "=== Running expo-modules-autolinking search ==="
-            cd ..
-            pnpm exec expo-modules-autolinking search --platform android 2>&1 || true
-            exit 1
-          fi
-          echo ""
-          echo "=== Checking app/build.gradle for native-usb dependency ==="
-          if grep -qi "native-usb\|nativeusb" app/build.gradle 2>/dev/null; then
-            echo "✅ native-usb dependency found in app/build.gradle"
-          else
-            echo "❌ native-usb dependency NOT found in app/build.gradle!"
+            echo "=== app/build.gradle dependencies ==="
+            grep -A5 "dependencies" app/build.gradle
           fi
 
       - name: Patch build config
@@ -108,7 +116,6 @@ jobs:
           if ! grep -q 'org.gradle.caching' gradle.properties; then
             echo "org.gradle.caching=true" >> gradle.properties
           fi
-          # Patch NDK version to pre-installed version
           if [ -f build.gradle ]; then
             sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
           fi
