@@ -1,10 +1,14 @@
 /**
- * Typed RPC client for the DroidVibe backend. Calls POST /rpc/<ns>/<proc> with
- * a JSON body. Falls back to a clear offline error when the backend is
- * unreachable so the UI can show an explicit offline state (never fake success).
+ * Typed RPC client for the DroidVibe backend. Calls POST /rpc/<ns>/<proc>.
+ * Falls back to a clear offline error when the backend is unreachable.
+ *
+ * AI features (explainError, generate, fix) work WITHOUT a backend when
+ * the user provides an API key in Settings — calls go directly to the AI
+ * provider from the phone via direct-ai.ts.
  */
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { directAi } from './direct-ai';
 
 const DEFAULT_BASE =
   ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
@@ -43,7 +47,6 @@ async function rpc<T>(path: string, input: unknown): Promise<T> {
     if (!json.ok) throw new Error(json.error ?? 'RPC error');
     return json.data as T;
   } catch (e) {
-    // Offline mode: rethrow so callers can show a clear offline state.
     throw new Error('Backend unreachable: ' + (e as Error).message);
   }
 }
@@ -72,9 +75,18 @@ export const api = {
     save: (input: unknown) => rpc('sketches/save', input),
   },
   ai: {
-    explainError: (input: unknown) => rpc('ai/explainError', input),
-    generate: (input: { prompt: string; boardFqbn?: string }) => rpc('ai/generate', input),
-    fix: (input: unknown) => rpc('ai/fix', input),
+    explainError: async (input: unknown) => {
+      if (await directAi.isAvailable()) return directAi.explainError(input as { error: string; code?: string; board?: string });
+      return rpc('ai/explainError', input);
+    },
+    generate: async (input: { prompt: string; boardFqbn?: string }) => {
+      if (await directAi.isAvailable()) return directAi.generate(input);
+      return rpc('ai/generate', input);
+    },
+    fix: async (input: unknown) => {
+      if (await directAi.isAvailable()) return directAi.fix(input as { code: string; error: string });
+      return rpc('ai/fix', input);
+    },
   },
   examples: {
     list: () => rpc('examples/list', {}),
