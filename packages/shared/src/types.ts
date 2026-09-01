@@ -49,17 +49,14 @@ export const DEFAULT_SERIAL_OPTIONS: SerialOptions = {
 /** A USB device as seen by the native transport. */
 export interface UsbDevice {
   id: string;
-  /** USB vendor ID (hex string, e.g. "2a03"). */
   vendorId: string;
-  /** USB product ID (hex string, e.g. "0043"). */
   productId: string;
   serialNumber: string | null;
   manufacturer: string | null;
   productName: string | null;
-  /** Detected driver family for serial bridges. */
   driver: 'cdc-acm' | 'ch340' | 'cp210x' | 'ftdi' | 'unknown';
-  /** True when the device enumerated in BOOTSEL mode (RP2040). */
   bootsel: boolean;
+  isRp2040?: boolean;
   permission: 'granted' | 'denied' | 'pending' | 'unknown';
   state: DeviceState;
 }
@@ -68,15 +65,12 @@ export interface UsbDevice {
 export interface UploadRequest {
   device: Pick<UsbDevice, 'id' | 'vendorId' | 'productId'>;
   protocol: UploadProtocol;
-  /** Firmware bytes, base64-encoded. */
   firmware: string;
   filename: string;
   baudRate?: number;
   verify: boolean;
 }
 
-/** Staged progress reported during upload. 
-Never report "done" on failure. */
 export type UploadStage =
   | 'preparing'
   | 'resetting'
@@ -89,15 +83,12 @@ export type UploadStage =
 
 export interface UploadProgress {
   stage: UploadStage;
-  /** 0..1 progress within the current stage. */
   progress: number;
-  /** Bytes written / total bytes where known. */
   bytesWritten?: number;
   bytesTotal?: number;
   message?: string;
 }
 
-/** Result of an upload operation. */
 export interface UploadResult {
   ok: boolean;
   stage: UploadStage;
@@ -105,17 +96,15 @@ export interface UploadResult {
   message: string;
 }
 
-/** Hardware error with actionable suggestion for the user. */
 export interface HardwareError {
   message: string;
-  /** Plain-English suggestion for resolving the error. */
   suggestion: string | null;
-  /** The upload stage at which the error occurred, if applicable. */
   stage?: UploadStage;
 }
 
 /** Logic-analyzer capture configuration. */
 export interface CaptureConfig {
+  deviceId: string;
   sampleRate: number;
   numSamples: number;
   channels: number;
@@ -130,11 +119,41 @@ export interface CaptureConfig {
 
 /** Packed capture result returned by the bench. */
 export interface CaptureResult {
-  config: CaptureConfig;
-  /** Packed samples — each 32-bit word holds up to 8 channel bits. */
-  data: Uint8Array;
   actualSamples: number;
   durationUs: number;
+  data: Uint8Array;
+  sampleRate: number;
+  channels: number;
+}
+
+/** RP2040 operating mode. */
+export type RP2040Mode = 'bootsel' | 'application' | 'not-rp2040';
+
+/** Helper firmware mode for the RP2040 multi-tool. */
+export type RP2040HelperMode = 'logic-analyzer' | 'swd' | 'jtag' | 'avr-isp' | 'serial-bridge';
+
+/** Request to flash helper firmware onto an RP2040 via PICOBOOT. */
+export interface HelperFirmwareRequest {
+  deviceId: string;
+  uf2Base64: string;
+  verify: boolean;
+}
+
+/** SWD transfer request (read or write a 32-bit word). */
+export interface SwdTransferRequest {
+  deviceId: string;
+  isRead: boolean;
+  apDp: number;
+  addr: number;
+  data: number;
+}
+
+/** JTAG transfer request (shift TMS/TDI and read TDO). */
+export interface JtagTransferRequest {
+  deviceId: string;
+  tmsBase64: string;
+  tdiBase64: string;
+  bitCount: number;
 }
 
 /** A single compiler diagnostic. */
@@ -145,15 +164,12 @@ export interface Diagnostic {
   column: number;
   message: string;
   code?: string;
-  /** Plain-English explanation, filled in by the diagnostics translator. */
   explanation?: string;
 }
 
-/** Result of a compile request. */
 export interface CompileResult {
   ok: boolean;
   diagnostics: Diagnostic[];
-  /** Firmware bytes (base64) when compilation succeeded. */
   firmware?: string;
   firmwarePath?: string;
   fqbn: string;
@@ -161,7 +177,6 @@ export interface CompileResult {
   stdout: string;
 }
 
-/** Board identity resolved from a VID/PID pair. */
 export interface BoardIdentity {
   vendorId: string;
   productId: string;
@@ -172,7 +187,6 @@ export interface BoardIdentity {
   notes?: string;
 }
 
-/** Minimal sketch file descriptor. */
 export interface SketchFile {
   path: string;
   content: string;
