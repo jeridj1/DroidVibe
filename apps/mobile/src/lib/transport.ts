@@ -12,13 +12,16 @@ import type {
   UploadResult,
   CaptureConfig,
   CaptureResult,
+  HelperFirmwareRequest,
+  SwdTransferRequest,
+  JtagTransferRequest,
+  RP2040Mode,
 } from '@droidvibe/shared';
 
 const native: DroidVibeUsbModuleType | null = getNativeUsbModule();
 
 export const isNativeUsbAvailable = (): boolean => native !== null;
 
-/** List USB devices; empty in mock mode. */
 export async function listDevices(): Promise<UsbDevice[]> {
   if (native) return native.listDevices();
   return [];
@@ -59,7 +62,6 @@ export async function upload(
   onProgress?: (p: UploadProgress) => void,
 ): Promise<UploadResult> {
   if (native) return native.upload(request, onProgress);
-  // Mock mode never fakes success.
   return { ok: false, stage: 'failed', verified: false, message: 'Native USB unavailable (Expo Go).' };
 }
 
@@ -76,4 +78,46 @@ export async function flashUf2(
 export async function capture(config: CaptureConfig): Promise<CaptureResult> {
   if (native) return native.capture(config);
   throw new Error('Capture requires native USB + verified RP2040 helper firmware.');
+}
+
+// ---- RP2040 multi-mode functions ----
+
+/** Flash helper firmware onto an RP2040 in BOOTSEL mode. */
+export async function flashHelperFirmware(
+  request: HelperFirmwareRequest,
+): Promise<UploadResult> {
+  if (native) return native.flashHelperFirmware(request);
+  return { ok: false, stage: 'failed', verified: false, message: 'Native USB unavailable (Expo Go).' };
+}
+
+/** Send the Pico back to BOOTSEL mode via serial command (requires open serial). */
+export async function enterBootselViaSerial(deviceId: string): Promise<boolean> {
+  if (native) return native.enterBootselViaSerial(deviceId);
+  return false;
+}
+
+/** SWD transfer (read or write a 32-bit word via SWD helper firmware). */
+export async function swdTransfer(request: SwdTransferRequest): Promise<number> {
+  if (native) return native.swdTransfer(request);
+  throw new Error('SWD transfer requires native USB + SWD helper firmware.');
+}
+
+/** JTAG transfer (shift TMS/TDI and read TDO via JTAG helper firmware). */
+export async function jtagTransfer(request: JtagTransferRequest): Promise<Uint8Array> {
+  if (native) return native.jtagTransfer(request);
+  throw new Error('JTAG transfer requires native USB + JTAG helper firmware.');
+}
+
+/** Check if an RP2040 device is in BOOTSEL mode. */
+export async function isRp2040Bootsel(deviceId: string): Promise<boolean> {
+  if (native) return native.isRp2040Bootsel(deviceId);
+  return false;
+}
+
+/** Get the RP2040 mode (bootsel, application, or not-rp2040). */
+export async function getRp2040Mode(
+  deviceId: string,
+): Promise<{ mode: RP2040Mode; isRP2040: boolean }> {
+  if (native) return native.getRp2040Mode(deviceId);
+  return { mode: 'not-rp2040', isRP2040: false };
 }
