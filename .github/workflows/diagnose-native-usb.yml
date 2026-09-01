@@ -1,6 +1,9 @@
 name: Diagnose Native USB Linking
 
 on:
+  push:
+    branches:
+      - diagnose-usb
   workflow_dispatch:
 
 jobs:
