@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.util.Base64
 import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 // ---- Record input types (mirror the shared TypeScript types) ----
 
-class SerialOptionsInput : Record {
+class SerialOptionsInput : Record() {
     @Field val baudRate: Int = 115200
     @Field val dataBits: Int = 8
     @Field val stopBits: Int = 1
@@ -26,7 +27,7 @@ class SerialOptionsInput : Record {
     @Field val rts: Boolean = false
 }
 
-class UploadRequestInput : Record {
+class UploadRequestInput : Record() {
     @Field val deviceId: String = ""
     @Field val vendorId: String = ""
     @Field val productId: String = ""
@@ -37,7 +38,8 @@ class UploadRequestInput : Record {
     @Field val verify: Boolean = true
 }
 
-class CaptureConfigInput : Record {
+class CaptureConfigInput : Record() {
+    @Field val deviceId: String = ""
     @Field val sampleRate: Int = 1_000_000
     @Field val numSamples: Int = 8192
     @Field val channels: Int = 8
@@ -46,12 +48,33 @@ class CaptureConfigInput : Record {
     @Field val triggerEdge: String = "rising"
 }
 
+class HelperFirmwareInput : Record() {
+    @Field val deviceId: String = ""
+    @Field val uf2Base64: String = ""
+    @Field val verify: Boolean = true
+}
+
+class SwdTransferInput : Record() {
+    @Field val deviceId: String = ""
+    @Field val isRead: Boolean = true
+    @Field val apDp: Int = 0
+    @Field val addr: Int = 0
+    @Field val data: Int = 0
+}
+
+class JtagTransferInput : Record() {
+    @Field val deviceId: String = ""
+    @Field val tmsBase64: String = ""
+    @Field val tdiBase64: String = ""
+    @Field val bitCount: Int = 0
+}
+
 /**
  * DroidVibe native USB transport module.
  *
  * Wraps android.hardware.usb to expose device enumeration, the Android USB
- * permission flow, CDC-ACM serial I/O, upload and capture to the React layer.
- * Only available in a custom Expo dev/production build.
+ * permission flow, CDC-ACM serial I/O, upload, RP2040 multi-mode control,
+ * and capture to the React layer. Only available in a custom Expo dev/production build.
  */
 class DroidVibeUsbModule : Module() {
 
@@ -63,10 +86,7 @@ class DroidVibeUsbModule : Module() {
     private val usbManager: UsbManager
         get() = appContext.reactContext?.getSystemService(Context.USB_SERVICE) as UsbManager
 
-    /** Open serial connections keyed by device id. */
     private val serialConnections = ConcurrentHashMap<String, UsbSerialDriver>()
-
-    /** Pending permission promises keyed by device id. */
     private val permissionPromises = ConcurrentHashMap<String, Promise>()
 
     private val usbReceiver = object : BroadcastReceiver() {
@@ -147,7 +167,6 @@ class DroidVibeUsbModule : Module() {
                     android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
                 )
                 usbManager.requestPermission(device, pi)
-
             } catch (e: Exception) {
                 permissionPromises.remove(deviceId)
                 promise.reject("USB_PERMISSION_FAILED", e.message ?: "requestPermission failed", e)
@@ -200,7 +219,7 @@ class DroidVibeUsbModule : Module() {
                 if (!usbManager.hasPermission(device)) {
                     promise.reject("USB_NO_PERMISSION", "USB permission not granted", null); return@AsyncFunction
                 }
-                val firmware = android.util.Base64.decode(request.firmwareBase64, android.util.Base64.DEFAULT)
+                val firmware = Base64.decode(request.firmwareBase64, Base64.DEFAULT)
                 val result = Uploaders.upload(
                     usbManager, device, request.protocol, firmware,
                     request.filename, request.baudRate, request.verify,
@@ -223,14 +242,14 @@ class DroidVibeUsbModule : Module() {
             }
         }
 
-        // ---- RP2040 UF2 / PICOBOOT ----
+        // ---- RP2040 UF2 / PICOBOOT flashing ----
         AsyncFunction("flashUf2") { deviceId: String, uf2Base64: String, verify: Boolean, promise: Promise ->
             try {
                 val device = findDevice(deviceId)
                 if (!usbManager.hasPermission(device)) {
                     promise.reject("USB_NO_PERMISSION", "USB permission not granted", null); return@AsyncFunction
                 }
-                val uf2 = android.util.Base64.decode(uf2Base64, android.util.Base64.DEFAULT)
+                val uf2 = Base64.decode(uf2Base64, Base64.DEFAULT)
                 val result = PicobootFlasher.flash(usbManager, device, uf2, verify) { stage, progress, message ->
                     sendEvent("onUploadProgress", mapOf(
                         "deviceId" to deviceId,
@@ -250,32 +269,144 @@ class DroidVibeUsbModule : Module() {
             }
         }
 
-        // ---- Logic-analyzer capture (requires an RP2040 helper image; best-effort) ----
+        // ---- RP2040 helper firmware flashing (from base64 UF2 data) ----
+        AsyncFunction("flashHelperFirmware") { request: HelperFirmwareInput, promise: Promise ->
+            try {
+                val device = findDevice(request.deviceId)
+                if (!usbManager.hasPermission(device)) {
+                    promise.reject("USB_NO_PERMISSION", "USB permission not granted", null); return@AsyncFunction
+                }
+                if (!RP2040Controller.isBootSel(device)) {
+                    promise.reject("USB_NOT_BOOTSEL", "Device is not in BOOTSEL mode. Hold BOOTSEL while plugging in the Pico.", null)
+                    return@AsyncFunction
+                }
+                val uf2 = Base64.decode(request.uf2Base64, Base64.DEFAULT)
+                val result = PicobootFlasher.flash(usbManager, device, uf2, request.verify) { stage, progress, message ->
+                    sendEvent("onUploadProgress", mapOf(
+                        "deviceId" to request.deviceId,
+                        "stage" to stage,
+                        "progress" to progress,
+                        "message" to (message ?: ""),
+                    ))
+                }
+                promise.resolve(mapOf(
+                    "ok" to result.ok,
+                    "stage" to result.stage,
+                    "verified" to result.verified,
+                    "message" to result.message,
+                ))
+            } catch (e: Exception) {
+                promise.reject("USB_HELPER_FLASH_FAILED", e.message ?: "flashHelperFirmware failed", e)
+            }
+        }
+
+        // ---- RP2040 enter BOOTSEL via serial command ----
+        AsyncFunction("enterBootselViaSerial") { deviceId: String, promise: Promise ->
+            try {
+                val driver = serialConnections[deviceId]
+                if (driver == null) {
+                    promise.reject("USB_NOT_OPEN", "Serial not open. Open serial to the Pico first.", null)
+                    return@AsyncFunction
+                }
+                val ok = RP2040Controller.enterBootselViaSerial(driver)
+                promise.resolve(ok)
+            } catch (e: Exception) {
+                promise.reject("USB_BOOTSEL_FAILED", e.message ?: "enterBootselViaSerial failed", e)
+            }
+        }
+
+        // ---- RP2040 logic-analyzer capture (requires helper firmware) ----
         AsyncFunction("capture") { config: CaptureConfigInput, promise: Promise ->
             try {
-                val result = CaptureService.capture(usbManager, config.sampleRate, config.numSamples, config.channels)
+                val driver = serialConnections[config.deviceId]
+                if (driver == null) {
+                    promise.reject("USB_NOT_OPEN", "Serial not open. Open serial to the Pico (running LA helper firmware) first.", null)
+                    return@AsyncFunction
+                }
+                val result = RP2040Controller.capture(
+                    driver, config.sampleRate, config.numSamples, config.channels,
+                )
                 promise.resolve(mapOf(
                     "actualSamples" to result.actualSamples,
                     "durationUs" to result.durationUs,
                     "data" to result.data,
+                    "sampleRate" to result.sampleRate,
+                    "channels" to result.channels,
                 ))
             } catch (e: Exception) {
                 promise.reject("USB_CAPTURE_FAILED", e.message ?: "capture failed", e)
+            }
+        }
+
+        // ---- RP2040 SWD transfer ----
+        AsyncFunction("swdTransfer") { input: SwdTransferInput, promise: Promise ->
+            try {
+                val driver = serialConnections[input.deviceId]
+                if (driver == null) {
+                    promise.reject("USB_NOT_OPEN", "Serial not open.", null)
+                    return@AsyncFunction
+                }
+                val result = RP2040Controller.swdTransfer(driver, input.isRead, input.apDp, input.addr, input.data)
+                promise.resolve(result)
+            } catch (e: Exception) {
+                promise.reject("USB_SWD_FAILED", e.message ?: "swdTransfer failed", e)
+            }
+        }
+
+        // ---- RP2040 JTAG transfer ----
+        AsyncFunction("jtagTransfer") { input: JtagTransferInput, promise: Promise ->
+            try {
+                val driver = serialConnections[input.deviceId]
+                if (driver == null) {
+                    promise.reject("USB_NOT_OPEN", "Serial not open.", null)
+                    return@AsyncFunction
+                }
+                val tms = Base64.decode(input.tmsBase64, Base64.DEFAULT)
+                val tdi = Base64.decode(input.tdiBase64, Base64.DEFAULT)
+                val result = RP2040Controller.jtagTransfer(driver, tms, tdi, input.bitCount)
+                promise.resolve(result)
+            } catch (e: Exception) {
+                promise.reject("USB_JTAG_FAILED", e.message ?: "jtagTransfer failed", e)
+            }
+        }
+
+        // ---- Check if RP2040 is in BOOTSEL mode ----
+        AsyncFunction("isRp2040Bootsel") { deviceId: String, promise: Promise ->
+            try {
+                val device = findDevice(deviceId)
+                promise.resolve(RP2040Controller.isBootSel(device))
+            } catch (e: Exception) {
+                promise.reject("USB_LOOKUP_FAILED", e.message ?: "device not found", e)
+            }
+        }
+
+        // ---- Get RP2040 mode info ----
+        AsyncFunction("getRp2040Mode") { deviceId: String, promise: Promise ->
+            try {
+                val device = findDevice(deviceId)
+                val mode = when {
+                    RP2040Controller.isBootSel(device) -> "bootsel"
+                    RP2040Controller.isApplicationMode(device) -> "application"
+                    else -> "not-rp2040"
+                }
+                promise.resolve(mapOf("mode" to mode, "isRP2040" to RP2040Controller.isRP2040(device)))
+            } catch (e: Exception) {
+                promise.reject("USB_LOOKUP_FAILED", e.message ?: "device not found", e)
             }
         }
     }
 
     private fun findDevice(deviceId: String): UsbDevice {
         return usbManager.deviceList.values.firstOrNull { it.deviceId.toString() == deviceId }
-            ?: throw Exception("device not found: $deviceId")
+            ?: throw Exception("device not found: " + deviceId)
     }
 
-    /** Map a UsbDevice to the shared JS shape. */
     private fun deviceToMap(d: UsbDevice): Map<String, Any?> {
         val vid = String.format("%04x", d.vendorId)
         val pid = String.format("%04x", d.productId)
         val driver = detectDriver(d)
         val bootsel = vid == "2e8a" && pid == "0003"
+        val isRp2040 = vid == "2e8a"
         return mapOf(
             "id" to d.deviceId.toString(),
             "vendorId" to vid,
@@ -285,14 +416,13 @@ class DroidVibeUsbModule : Module() {
             "productName" to (d.productName ?: null),
             "driver" to driver,
             "bootsel" to bootsel,
+            "isRp2040" to isRp2040,
             "permission" to (if (usbManager.hasPermission(d)) "granted" else "pending"),
             "state" to if (usbManager.hasPermission(d)) "detected" else "permission-required",
         )
     }
 
-    /** Heuristic driver family from interface class + VID. */
     private fun detectDriver(d: UsbDevice): String {
-        // CDC-ACM (class 02 / subclass 02) â Arduino Leonardo/Micro, native USB
         for (i in 0 until d.interfaceCount) {
             val iface = d.getInterface(i)
             if (iface.interfaceClass == 2 && iface.interfaceSubclass == 2) return "cdc-acm"
