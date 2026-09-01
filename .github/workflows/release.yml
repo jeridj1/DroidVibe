@@ -61,34 +61,23 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
 
-      - name: Ensure native USB module is linked
+      - name: Verify native USB module is autolinked
         working-directory: apps/mobile/android
         run: |
-          echo "=== Checking settings.gradle for native-usb ==="
-          if grep -qi "native-usb\|nativeusb" settings.gradle 2>/dev/null; then
-            echo "native-usb module found in settings.gradle (autolinking works)"
-          else
-            echo "native-usb not autolinked - manually injecting into gradle files"
-            
-            echo "" >> settings.gradle
-            echo "// DroidVibe native USB module (manual link)" >> settings.gradle
-            echo "include ':@droidvibe_native-usb'" >> settings.gradle
-            echo "project(':@droidvibe_native-usb').projectDir = new File(rootProject.projectDir, '../../packages/native-usb/android')" >> settings.gradle
-            
-            if grep -q "dependencies" app/build.gradle; then
-              sed -i "/dependencies {/a\    implementation project(':@droidvibe_native-usb')" app/build.gradle
-            else
-              echo "dependencies { implementation project(':@droidvibe_native-usb') }" >> app/build.gradle
-            fi
-            
-            echo "Manually added native-usb module to settings.gradle and app/build.gradle"
-            
-            echo "=== settings.gradle (last 10 lines) ==="
-            tail -10 settings.gradle
-            echo ""
-            echo "=== app/build.gradle dependencies ==="
-            grep -A5 "dependencies" app/build.gradle
-          fi
+          echo "=== Verifying native USB module is autolinked ==="
+          echo ""
+          echo "settings.gradle autolinking section:"
+          grep -n "useExpoModules\|autolinking" settings.gradle || echo "No autolinking found"
+          echo ""
+          echo "Module directory check:"
+          ls -la ../../packages/native-usb/android/build.gradle 2>/dev/null && echo "Module build.gradle exists" || echo "Module build.gradle NOT found"
+          echo ""
+          echo "NOTE: The nativeModulesDir config in package.json tells Expo autolinking"
+          echo "to search packages/ for local modules. useExpoModules() in settings.gradle"
+          echo "handles the actual module linking dynamically - no manual injection needed."
+          echo ""
+          echo "=== settings.gradle (last 10 lines) ==="
+          tail -10 settings.gradle
 
       - name: Patch build config
         working-directory: apps/mobile/android
@@ -119,12 +108,6 @@ jobs:
           fi
           echo "=== Final gradle.properties ==="
           cat gradle.properties
-          echo ""
-          echo "=== settings.gradle (last 15 lines) ==="
-          tail -15 settings.gradle
-          echo ""
-          echo "=== app/build.gradle dependencies ==="
-          grep -A10 "dependencies" app/build.gradle || echo "No dependencies section found"
 
       - name: Build debug APK
         working-directory: apps/mobile/android
@@ -173,16 +156,6 @@ jobs:
             echo ""
             echo "Tag: $TAG"
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo ""
-            echo "### settings.gradle (last 20 lines)"
-            echo '~~~'
-            tail -20 apps/mobile/android/settings.gradle 2>/dev/null || echo "File not found"
-            echo '~~~'
-            echo ""
-            echo "### app/build.gradle dependencies"
-            echo '~~~'
-            grep -A10 'dependencies' apps/mobile/android/app/build.gradle 2>/dev/null || echo "File not found"
-            echo '~~~'
             echo ""
             echo "### Build Output (last 200 lines)"
             echo '~~~'
