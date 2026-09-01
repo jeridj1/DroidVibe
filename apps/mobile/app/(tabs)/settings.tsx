@@ -12,30 +12,14 @@ import Constants from 'expo-constants';
 const AI_PROVIDERS = ['mistral', 'openai', 'google'] as const;
 
 const MODELS_BY_PROVIDER: Record<string, string[]> = {
-  mistral: [
-    'mistral-large-latest',
-    'mistral-medium-latest',
-    'mistral-small-latest',
-    'open-mistral-nemo',
-    'open-codestral-mistral',
-  ],
-  openai: [
-    'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-4-turbo',
-    'gpt-3.5-turbo',
-  ],
-  google: [
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
-    'gemini-2.0-flash-exp',
-  ],
+  mistral: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest', 'open-mistral-nemo', 'open-codestral-mistral'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+  google: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'],
 };
 
 export default function SettingsScreen() {
   const { palette, mode, setMode, textScale, setTextScale, twoPane, setTwoPane } = useTheme();
   const insets = useSafeAreaInsets();
-
   const themeOptions: ThemeMode[] = ['light', 'dark', 'system'];
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const [backendUrl, setBackendUrl] = useState('');
@@ -48,8 +32,7 @@ export default function SettingsScreen() {
     getApiUrl().then(setBackendUrl);
     getAiProvider().then(setAiProviderState);
     getAiModel().then(setAiModelState);
-   
- getAiKey().then(setAiKeyState);
+    getAiKey().then(setAiKeyState);
   }, []);
 
   async function persistBackendUrl(url: string) {
@@ -78,28 +61,15 @@ export default function SettingsScreen() {
   }
 
   function resetOnboarding() {
-    Alert.alert(
-      'Reset onboarding',
-      'Show the intro tutorial again on next launch?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          onPress: () => AsyncStorage.removeItem('@droidvibe/onboarding_seen'),
-        },
-      ]
-    );
+    Alert.alert('Reset onboarding', 'Show the intro tutorial again on next launch?',
+      [{ text: 'Cancel', style: 'cancel' }, { text: 'Reset', onPress: () => AsyncStorage.removeItem('@droidvibe/onboarding_seen') }]);
   }
 
   const aiModels = MODELS_BY_PROVIDER[aiProvider] ?? MODELS_BY_PROVIDER.mistral;
 
   return (
-    <ScrollView
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 32 }}
-      style={{ backgroundColor: palette.bg }}
-    >
+    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 32 }} style={{ backgroundColor: palette.bg }}>
       <Text style={[styles.title, { color: palette.text }]}>Settings</Text>
-
       <SectionTitle title="Appearance" subtitle="Theme, text scale, layout" />
       <Card style={{ marginBottom: 12 }}>
         <Row style={{ marginBottom: 12 }}>
@@ -107,18 +77,12 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }} />
           <Row gap={6}>
             {themeOptions.map((t) => (
-              <Pressable
-                key={t}
-                onPress={() => setMode(t)}
-                style={[styles.seg, { backgroundColor: mode === t ? palette.accent : palette.bgInset }]}
-              >
-                <Text style={{ color: mode === t ? palette.textOnAccent : palett
-e.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
+              <Pressable key={t} onPress={() => setMode(t)} style={[styles.seg, { backgroundColor: mode === t ? palette.accent : palette.bgInset }]}>
+                <Text style={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
               </Pressable>
             ))}
           </Row>
         </Row>
-
         <Row style={{ marginBottom: 12 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Text scale</Text>
           <View style={{ flex: 1 }} />
@@ -130,14 +94,12 @@ e.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}
             ))}
           </Row>
         </Row>
-
         <Row>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Tablet / DeX two-pane</Text>
           <View style={{ flex: 1 }} />
           <Switch value={twoPane} onValueChange={setTwoPane} accessibilityLabel="Toggle two-pane layout" />
         </Row>
       </Card>
-
       <SectionTitle title="Account" subtitle="Cloud workspace sign-in" />
       <Card style={{ marginBottom: 12 }}>
         <Row justify="space-between">
@@ -150,19 +112,13 @@ e.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}
         <Divider />
         <Button title="Sign in" onPress={() => Alert.alert('Sign in', 'Coming soon!')} variant="ghost" size="sm" />
       </Card>
-
       <SectionTitle title="AI Provider" subtitle="Direct AI — no backend needed with API key" />
       <Card style={{ marginBottom: 12 }}>
         <View style={{ marginBottom: 12 }}>
           <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Provider</Text>
-          <View style={{ flexDirectio
-n: 'row', flexWrap: 'wrap', gap: 6 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {AI_PROVIDERS.map((p) => (
-              <Pressable
-                key={p}
-                onPress={() => persistAiProvider(p)}
-                style={[styles.seg, { backgroundColor: aiProvider === p ? palette.accent : palette.bgInset }]}
-              >
+              <Pressable key={p} onPress={() => persistAiProvider(p)} style={[styles.seg, { backgroundColor: aiProvider === p ? palette.accent : palette.bgInset }]}>
                 <Text style={{ color: aiProvider === p ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{p}</Text>
               </Pressable>
             ))}
@@ -172,11 +128,7 @@ n: 'row', flexWrap: 'wrap', gap: 6 }}>
           <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Model</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {aiModels.map((m) => (
-              <Pressable
-                key={m}
-                onPress={() => persistAiModel(m)}
-                style={[styles.seg, { backgroundColor: aiModel === m ? palette.accent : palette.bgInset }]}
-              >
+              <Pressable key={m} onPress={() => persistAiModel(m)} style={[styles.seg, { backgroundColor: aiModel === m ? palette.accent : palette.bgInset }]}>
                 <Text style={{ color: aiModel === m ? palette.textOnAccent : palette.textMuted, fontSize: 11, fontWeight: '700' }}>{m}</Text>
               </Pressable>
             ))}
@@ -185,44 +137,20 @@ n: 'row', flexWrap: 'wrap', gap: 6 }}>
         <View>
           <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>API Key</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={aiKey}
-              onChangeText={persistAiKey}
-              placeholder="enter key for direct AI access"
-              placeholderTextColor={palette.textMuted}
-              secureTextEntry={!showAiKey}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <TextInput style={[styles.input, { flex: 1 }]} value={aiKey} onChangeText={persistAiKey} placeholder="enter key for direct AI access" placeholderTextColor={palette.textMuted} secureTextEntry={!showAiKey} autoCapitalize="none" autoCorrect={false} />
             <Button title={showAiKey ? 'Hide' : 'Show'} onPress={() => setShowAiKey((v) => !v)} variant="ghost" size="sm" />
           </View>
-          <Text style={{ color: pa
-lette.textMuted, fontSize: 11, marginTop: 6 }}>
-            {aiKey ? '✓ AI calls go directly from your phone — no backend needed.' : 'When set, AI features work without a backend server.'}
-          </Text>
+          <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>{aiKey ? '✓ AI calls go directly from your phone — no backend needed.' : 'When set, AI features work without a backend server.'}</Text>
         </View>
       </Card>
-
       <SectionTitle title="Backend (optional)" subtitle="Only needed for compilation" />
       <Card style={{ marginBottom: 12 }}>
         <View>
           <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
-          <TextInput
-            style={styles.input}
-            value={backendUrl}
-            onChangeText={persistBackendUrl}
-            placeholder="http://192.168.1.100:3001 (optional)"
-            placeholderTextColor={palette.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>
-            Only needed for on-device compilation. AI features work without it when an API key is set above.
-          </Text>
+          <TextInput style={styles.input} value={backendUrl} onChangeText={persistBackendUrl} placeholder="http://192.168.1.100:3001 (optional)" placeholderTextColor={palette.textMuted} autoCapitalize="none" autoCorrect={false} />
+          <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>Only needed for on-device compilation. AI features work without it when an API key is set above.</Text>
         </View>
       </Card>
-
       <SectionTitle title="Diagnostics" subtitle="System health checks" />
       <Card style={{ marginBottom: 12 }}>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
@@ -235,15 +163,13 @@ lette.textMuted, fontSize: 11, marginTop: 6 }}>
         </Row>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>App version</Text>
-          <Text style={{ color: palette.textMuted, fontSize: 1
-3 }}>{version}</Text>
+          <Text style={{ color: palette.textMuted, fontSize: 13 }}>{version}</Text>
         </Row>
         <Row justify="space-between">
           <Text style={{ color: palette.text, fontWeight: '600' }}>Platform</Text>
           <Text style={{ color: palette.textMuted, fontSize: 13 }}>{Constants.platform?.android ? 'Android' : 'Other'} {Constants.platform?.android?.version ?? ''}</Text>
         </Row>
       </Card>
-
       <SectionTitle title="Support" subtitle="Help and resources" />
       <Card style={{ marginBottom: 12 }}>
         <Pressable onPress={resetOnboarding}>
@@ -266,7 +192,6 @@ lette.textMuted, fontSize: 11, marginTop: 6 }}>
           </Row>
         </Pressable>
       </Card>
-
       <SectionTitle title="About" />
       <Card>
         <Row justify="space-between">
@@ -279,14 +204,10 @@ lette.textMuted, fontSize: 11, marginTop: 6 }}>
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>USB protocols</Text>
-          <Text style
-={{ color: palette.text }}>STK500 · AVR109 · ESP · PICOBOOT</Text>
+          <Text style={{ color: palette.text }}>STK500 · AVR109 · ESP · PICOBOOT</Text>
         </Row>
       </Card>
-
-      <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 16, textAlign: 'center' }}>
-        DroidVibe never reports hardware success unless actually confirmed.
-      </Text>
+      <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 16, textAlign: 'center' }}>DroidVibe never reports hardware success unless actually confirmed.</Text>
     </ScrollView>
   );
 }
@@ -294,12 +215,5 @@ lette.textMuted, fontSize: 11, marginTop: 6 }}>
 const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   seg: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  input: {
-    borderWidth: 1,
-    borderColor: 'rgba(150,150,150,0.3)',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-  },
+  input: { borderWidth: 1, borderColor: 'rgba(150,150,150,0.3)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
 });
