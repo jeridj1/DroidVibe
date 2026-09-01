@@ -74,8 +74,7 @@ export const api = {
   ai: {
     explainError: (input: unknown) => rpc('ai/explainError', input),
     generate: (input: { prompt: string; boardFqbn?: string }) => rpc('ai/generate', input),
-    fix: (input: unkno
-wn) => rpc('ai/fix', input),
+    fix: (input: unknown) => rpc('ai/fix', input),
   },
   examples: {
     list: () => rpc('examples/list', {}),
