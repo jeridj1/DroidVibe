@@ -141,7 +141,7 @@ export default function EditorScreen() {
     buildStageRef.current = buildStage;
   }, [buildStage]);
 
-  // Track code changes for undo history (debounced â only snapshots meaningful edits)
+  // Track code changes for undo history (debounced Ã¢ÂÂ only snapshots meaningful edits)
   useEffect(() => {
     if (code === lastCodeRef.current) return;
     const timer = setTimeout(() => {
@@ -209,7 +209,7 @@ export default function EditorScreen() {
     });
   }, []);
 
-  // USB disconnect detection â abort in-progress upload
+  // USB disconnect detection Ã¢ÂÂ abort in-progress upload
   useEffect(() => {
     if (!nativeUsb) return;
     const unsub = addDeviceListener((e) => {
@@ -290,7 +290,7 @@ export default function EditorScreen() {
     }
     if (!fw) return;
 
-    // Open device picker â filter to only permission-granted devices
+    // Open device picker Ã¢ÂÂ filter to only permission-granted devices
     const devs = await listDevices();
     const granted = devs.filter((d) => d.permission === 'granted');
     setDevices(granted);
@@ -342,7 +342,7 @@ export default function EditorScreen() {
     uploadDeviceRef.current = device;
     uploadAbortedRef.current = false;
 
-    // Board identification â explicit confirmed state
+    // Board identification Ã¢ÂÂ explicit confirmed state
     const id = identifyBoard(device.vendorId, device.productId);
     setIdentifiedBoard(id);
 
@@ -486,7 +486,7 @@ export default function EditorScreen() {
             <Text style={{ color: palette.accent, marginLeft: 4 }}>{boardOpen ? '\u25B2' : '\u25BC'}</Text>
           </Row>
         </Pressable>
-        <Row gap={4}>
+        <View style={styles.toolbar}>
           <Button title="Undo" onPress={undo} disabled={history.length === 0} variant="ghost" size="sm" />
           <Button title="Redo" onPress={redo} disabled={redoStack.length === 0} variant="ghost" size="sm" />
           <Button title="Find" onPress={() => setShowFind(true)} variant="ghost" size="sm" />
@@ -498,7 +498,7 @@ export default function EditorScreen() {
             size="sm"
           />
           <Button
-            title="Verify"
+            title="Compile"
             onPress={() => doCompile()}
             disabled={compiling || uploading}
             loading={compiling}
@@ -510,18 +510,18 @@ export default function EditorScreen() {
             disabled={compiling || uploading}
             loading={uploading}
           />
-        </Row>
+        </View>
       </View>
 
       {!nativeUsb && (
         <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
           <Text style={{ color: palette.warning, fontSize: 12, fontWeight: '600' }}>
-            Expo Go detected â native USB unavailable. Build a dev/production APK for hardware access.
+            Expo Go detected Ã¢ÂÂ native USB unavailable. Build a dev/production APK for hardware access.
           </Text>
         </View>
       )}
 
-      {/* Identified board state â explicit confirmed state */}
+      {/* Identified board state Ã¢ÂÂ explicit confirmed state */}
       {identifiedBoard && (
         <View style={[styles.boardIdBar, { backgroundColor: palette.accent + '12', borderColor: palette.accent + '40' }]}>
           <HardwareStatusBadge state="connected" />
@@ -530,7 +530,7 @@ export default function EditorScreen() {
               Board identified: {identifiedBoard.name}
             </Text>
             <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-              {identifiedBoard.protocol} â {identifiedBoard.fqbn}
+              {identifiedBoard.protocol} Ã¢ÂÂ {identifiedBoard.fqbn}
             </Text>
           </View>
         </View>
@@ -560,20 +560,22 @@ export default function EditorScreen() {
       </View>
 
       <View style={[styles.bottomPanel, { backgroundColor: palette.bgElevated, borderColor: palette.surfaceBorder }]}>
-        <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+        <View style={styles.outputHeader}>
           <SectionTitle
             title="Output"
             subtitle={compiling ? 'Compiling...' : uploading ? 'Uploading...' : undefined}
           />
-          {(compiling || uploading) && <ActivityIndicator color={palette.accent} />}
-          {diagnostics.length > 0 && (
-            <Button title="Explain (AI)" onPress={doExplain} variant="ghost" size="sm" />
-          )}
-          {diagnostics.length > 0 && (
-            <Button title="Fix (AI)" onPress={doFix} disabled={aiLoading} variant="ghost" size="sm" />
-          )}
-          <Button title="Generate" onPress={() => setShowAiGen((v) => !v)} variant="ghost" size="sm" />
-        </Row>
+          <View style={styles.aiButtons}>
+            {(compiling || uploading) && <ActivityIndicator color={palette.accent} />}
+            {diagnostics.length > 0 && (
+              <Button title="Explain (AI)" onPress={doExplain} variant="ghost" size="sm" />
+            )}
+            {diagnostics.length > 0 && (
+              <Button title="Fix (AI)" onPress={doFix} disabled={aiLoading} variant="ghost" size="sm" />
+            )}
+            <Button title="Generate" onPress={() => setShowAiGen((v) => !v)} variant="ghost" size="sm" />
+          </View>
+        </View>
 
         <BuildStageBar stage={buildStage} progress={progress} palette={palette} />
 
@@ -679,7 +681,7 @@ export default function EditorScreen() {
             </Card>          )}
           {diagnostics.length === 0 && !compiling && !ai && !uploadMsg && !error && (
             <Text style={{ color: palette.textMuted, fontSize: 12 }}>
-              No diagnostics. Tap Verify to compile, Upload to flash firmware.
+              No diagnostics. Tap Compile to build, Upload to flash firmware.
             </Text>          )}
         </ScrollView>
       </View>
@@ -706,7 +708,7 @@ export default function EditorScreen() {
                         <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
                           {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
-                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
+                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? 'â'} Â· VID {item.vendorId} PID {item.productId}
                         </Text>
                       </View>                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
                     </Row>                    {id && (
@@ -817,11 +819,28 @@ function BuildStageBar({ stage, progress, palette }: { stage: string; progress: 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
+    flexDirection: 'column',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  outputHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingBottom: 8,
+    marginBottom: 6,
+  },
+  aiButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
   },
   banner: { marginHorizontal: 12, marginBottom: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
   boardIdBar: {

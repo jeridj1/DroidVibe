@@ -1,11 +1,21 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Linking, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Row, SectionTitle, Button, Switch, Divider } from '@/src/components/ui';
 import { isNativeUsbAvailable } from '@/src/lib/transport';
+import { invalidateApiBaseCache } from '@/src/lib/api';
+import { getApiUrl, setApiUrl, getAiModel, setAiModel, getAiKey, setAiKey, DEFAULT_AI_MODEL } from '@/src/lib/appConfig';
 import Constants from 'expo-constants';
+
+const AI_MODELS = [
+  'mistral-large-latest',
+  'mistral-medium-latest',
+  'mistral-small-latest',
+  'open-mistral-nemo',
+  'open-codestral-mistral',
+];
 
 export default function SettingsScreen() {
   const { palette, mode, setMode, textScale, setTextScale, twoPane, setTwoPane } = useTheme();
@@ -13,6 +23,32 @@ export default function SettingsScreen() {
 
   const themeOptions: ThemeMode[] = ['light', 'dark', 'system'];
   const version = Constants.expoConfig?.version ?? '1.0.0';
+  const [backendUrl, setBackendUrl] = useState('');
+  const [aiModel, setAiModelState] = useState(DEFAULT_AI_MODEL);
+  const [aiKey, setAiKeyState] = useState('');
+  const [showAiKey, setShowAiKey] = useState(false);
+
+  useEffect(() => {
+    getApiUrl().then(setBackendUrl);
+    getAiModel().then(setAiModelState);
+    getAiKey().then(setAiKeyState);
+  }, []);
+
+  async function persistBackendUrl(url: string) {
+    setBackendUrl(url);
+    await setApiUrl(url);
+    invalidateApiBaseCache();
+  }
+
+  async function persistAiModel(model: string) {
+    setAiModelState(model);
+    await setAiModel(model);
+  }
+
+  async function persistAiKey(key: string) {
+    setAiKeyState(key);
+    await setAiKey(key);
+  }
 
   function resetOnboarding() {
     Alert.alert(
@@ -81,6 +117,54 @@ export default function SettingsScreen() {
           </View>
           <Badge label="local only" tone="neutral" />
         </Row>
+        <Divider />
+        <Button title="Sign in" onPress={() => Alert.alert('Sign in', 'Coming soon!')} variant="ghost" size="sm" />
+      </Card>
+
+      <SectionTitle title="AI & Backend" subtitle="Mistral AI configuration" />
+      <Card style={{ marginBottom: 12 }}>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
+          <TextInput
+            style={styles.input}
+            value={backendUrl}
+            onChangeText={persistBackendUrl}
+            placeholder="http://localhost:3001"
+            placeholderTextColor={palette.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>AI Model</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {AI_MODELS.map((m) => (
+              <Pressable
+                key={m}
+                onPress={() => persistAiModel(m)}
+                style={[styles.seg, { backgroundColor: aiModel === m ? palette.accent : palette.bgInset }]}
+              >
+                <Text style={{ color: aiModel === m ? palette.textOnAccent : palette.textMuted, fontSize: 11, fontWeight: '700' }}>{m}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Mistral API Key</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={aiKey}
+              onChangeText={persistAiKey}
+              placeholder="optional — overrides server key"
+              placeholderTextColor={palette.textMuted}
+              secureTextEntry={!showAiKey}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Button title={showAiKey ? 'Hide' : 'Show'} onPress={() => setShowAiKey((v) => !v)} variant="ghost" size="sm" />
+          </View>
+        </View>
       </Card>
 
       <SectionTitle title="Diagnostics" subtitle="System health checks" />
@@ -130,11 +214,11 @@ export default function SettingsScreen() {
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>Stack</Text>
-          <Text style={{ color: palette.text }}>Expo Â· Hono Â· Turso</Text>
+          <Text style={{ color: palette.text }}>Expo · Hono · Turso</Text>
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>USB protocols</Text>
-          <Text style={{ color: palette.text }}>STK500 Â· AVR109 Â· ESP Â· PICOBOOT</Text>
+          <Text style={{ color: palette.text }}>STK500 · AVR109 · ESP · PICOBOOT</Text>
         </Row>
       </Card>
 
@@ -148,4 +232,12 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   seg: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  input: {
+    borderWidth: 1,
+    borderColor: 'rgba(150,150,150,0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
 });
