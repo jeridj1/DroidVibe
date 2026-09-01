@@ -54,8 +54,7 @@ class UsbSerialDriver(
             close()
             return false
         }
-        setControlLines(dtr, r
-ts)
+        setControlLines(dtr, rts)
         readQueue.clear()
         running.set(true)
         readThread = Thread { readLoop() }.apply { isDaemon = true; name = "droidvibe-serial-read"; start() }
@@ -116,8 +115,7 @@ ts)
 
     private fun setLineCoding(baudRate: Int, dataBits: Int, stopBits: Int, parity: String): Boolean {
         val conn = connection ?: return false
-        val coding = encodeLineCoding(baudRate, dataBits, stopBits, parit
-y)
+        val coding = encodeLineCoding(baudRate, dataBits, stopBits, parity)
         return when (driverKind) {
             "cdc-acm" -> controlOut(0x21, 0x20, 0, 0, coding)
             "ch340" -> controlOut(0x40, 0xA1 or 0x9C, 0x9C00 or encodeCh340Baud(baudRate), 0, null) || controlOut(0x40, 0xA4, if (dataBits == 8) 0x03 else 0x00, 0, null)
@@ -160,8 +158,7 @@ y)
     private fun encodeCh340Baud(baud: Int): Int {
         return when (baud) {
             9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600 -> baud
-            el
-se -> baud
+            else -> baud
         }
     }
 
