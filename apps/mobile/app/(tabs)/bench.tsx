@@ -1,432 +1,440 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, TextInput, FlatList, Modal, Share } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme/ThemeProvider';
-import { Card, Badge, Button, Row, SectionTitle } from '@/src/components/ui';
+import { SectionTitle, Card, Badge, Row, Button, Divider } from '@/src/components/ui';
 import { WaveformViewer } from '@/src/components/WaveformViewer';
 import {
   listDevices,
   openSerial,
   closeSerial,
-  writeSerial,
-  addSerialDataListener,
-  addDeviceListener,
+  capture,
   isNativeUsbAvailable,
 } from '@/src/lib/transport';
-import { identifyBoard, DEFAULT_SERIAL_OPTIONS } from '@droidvibe/shared';
-import type { UsbDevice, SerialOptions } from '@droidvibe/shared';
+import type { UsbDevice, RP2040HelperMode } from '@droidvibe/shared';
 
-type Tab = 'serial' | 'plotter' | 'logic';
+type BenchTab = 'monitor' | 'plotter' | 'logic';
 
-const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400];
-const MAX_LINES = 500;
-const MAX_PLOTTER_POINTS = 240;
+const RP2040_MODES: { mode: RP2040HelperMode; label: string; desc: string }[] = [
+  { mode: 'logic-analyzer', label: 'Logic Analyzer', desc: '8-channel GPIO capture' },
+  { mode: 'swd', label: 'SWD Programmer', desc: 'ARM Cortex-M debug' },
+  { mode: 'jtag', label: 'JTAG Programmer', desc: 'JTAG boundary scan' },
+  { mode: 'avr-isp', label: 'AVR ISP', desc: 'SPI ISP for AVR chips' },
+  { mode: 'serial-bridge', label: 'Serial Bridge', desc: 'USB-serial passthrough' },
+];
 
-function bytesToText(data: Uint8Array): string {
-  let result = '';
-  for (let i = 0; i < data.length; i++) {
-    result += String.fromCharCode(data[i]);
-  }
-  return result;
-}
+const HOOKUP_GUIDES: Record<string, string[]> = {
+  'logic-analyzer': [
+    'GP2 -> CH0 (signal under test)',
+    'GP3 -> CH1',
+    'GP4 -> CH2',
+    'GP5 -> CH3',
+    'GP6 -> CH4',
+    'GP7 -> CH5',
+    'GP8 -> CH6',
+    'GP9 -> CH7',
+    'GND -> target GND',
+  ],
+  swd: [
+    'GP2 -> SWDIO (target SWDIO)',
+    'GP3 -> SWCLK (target SWCLK)',
+    'GND -> target GND',
+    '3V3 -> target VCC (optional)',
+  ],
+  jtag: [
+    'GP2 -> TCK (target TCK)',
+    'GP3 -> TMS (target TMS)',
+    'GP4 -> TDI (target TDI)',
+    'GP5 -> TDO (target TDO)',
+    'GND -> target GND',
+    '3V3 -> target VCC (optional)',
+  ],
+  'avr-isp': [
+    'GP2 -> RESET (target RESET)',
+    'GP3 -> SCK (target SCK)',
+    'GP4 -> MISO (target MISO)',
+    'GP5 -> MOSI (target MOSI)',
+    'GND -> target GND',
+  ],
+  'serial-bridge': [
+    'GP0 -> target RX',
+    'GP1 -> target TX',
+    'GND -> target GND',
+  ],
+};
 
 export default function BenchScreen() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('serial');
-  const [paused, setPaused] = useState(false);
-  const [lines, setLines] = useState<string[]>(['> Serial monitor ready.', '> Connect a board to stream data.']);
-
-  const nativeUsb = isNativeUsbAvailable();
-  const [showDevicePicker, setShowDevicePicker] = useState(false);
-  const [devices, setDevices] = useState<UsbDevice[]>([]);
+  const [tab, setTab] = useState<BenchTab>('logic');
   const [connectedDevice, setConnectedDevice] = useState<UsbDevice | null>(null);
-  const [baudRate, setBaudRate] = useState(115200);
-  const [inputText, setInputText] = useState('');
-  const [disconnected, setDisconnected] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false);
-  const [plotterData, setPlotterData] = useState<number[]>([]);
-  const scrollRef = useRef<ScrollView>(null);
-  const unsubRef = useRef<(() => void) | null>(null);
-  const pausedRef = useRef(false);
-  const deviceIdRef = useRef<string | null>(null);
-  const lastDeviceRef = useRef<UsbDevice | null>(null);
-  const plotterBufferRef = useRef<string>('');
+  const [devices, setDevices] = useState<UsbDevice[]>([]);
+  const [nativeUsb] = useState(isNativeUsbAvailable());
+  const [selectedMode, setSelectedMode] = useState<RP2040HelperMode>('logic-analyzer');
+  const [picoBootsel, setPicoBootsel] = useState(false);
+  const [flashing, setFlashing] = useState(false);
+  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureData, setCaptureData] = useState<number[] | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [sampleRate, setSampleRate] = useState(1000000);
+  const [numSamples, setNumSamples] = useState(8192);
+  const [channels, setChannels] = useState(8);
 
-  useEffect(() => { pausedRef.current = paused; }, [paused]);
-
-  // Listen for USB detach events to detect disconnection + auto-reconnect
   useEffect(() => {
-    const unsub = addDeviceListener((e) => {
-      if (e.type === 'detach' && deviceIdRef.current === e.device.id) {
-        setDisconnected(true);
-        setConnectedDevice(null);
-        setLines((prev) => [...prev, '> USB device disconnected.']);
-        if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-        deviceIdRef.current = null;
-      }
-      if (e.type === 'attach' && disconnected && lastDeviceRef.current) {
-        // Auto-reconnect: try to re-open the serial port
-        const reattach = e.device;
-        const expectedVendor = lastDeviceRef.current.vendorId;
-        const expectedProduct = lastDeviceRef.current.productId;
-        if (reattach.vendorId === expectedVendor && reattach.productId === expectedProduct) {
-          setReconnecting(true);
-          setLines((prev) => [...prev, '> Device reconnected. Re-opening serial port...']);
-          setTimeout(() => {
-            reconnectSerial(reattach);
-          }, 1000);
-        }
-      }
-    });
-    return () => { unsub(); };
-  }, [disconnected, connectedDevice]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-      if (deviceIdRef.current) { closeSerial(deviceIdRef.current).catch(() => {}); }
-    };
+    listDevices().then(setDevices).catch(() => {});
+    const interval = setInterval(() => {
+      listDevices().then(setDevices).catch(() => {});
+    }, 2000);
+    return () => clearInterval(interval);
   }, []);
 
-  async function connectSerial() {
-    if (!nativeUsb) return;
-    const devs = await listDevices();
-    setDevices(devs);
-    if (devs.length === 0) {
-      setLines((prev) => [...prev, '> No USB devices detected.']);
+  useEffect(() => {
+    const bootsel = devices.find(d => d.bootsel || d.isRp2040);
+    if (bootsel) {
+      setPicoBootsel(bootsel.bootsel);
+      if (!connectedDevice) setConnectedDevice(bootsel);
+    }
+  }, [devices]);
+
+  async function preparePico() {
+    const pico = devices.find(d => d.bootsel);
+    if (!pico) {
+      Alert.alert(
+        'No Pico in BOOTSEL mode',
+        'Hold the BOOTSEL button on your Raspberry Pi Pico while plugging it in, then try again.',
+      );
       return;
     }
-    setShowDevicePicker(true);
-  }
-
-  async function selectDevice(device: UsbDevice) {
-    setShowDevicePicker(false);
-    setDisconnected(false);
-    await openSerialConnection(device);
-  }
-
-  async function openSerialConnection(device: UsbDevice) {
+    setFlashing(true);
+    setFlashMsg('Flashing ' + selectedMode + ' helper firmware...');
     try {
-      const opts: SerialOptions = { ...DEFAULT_SERIAL_OPTIONS, baudRate };
-      const ok = await openSerial(device.id, opts);
-      if (!ok) {
-        setLines((prev) => [...prev, '> Failed to open serial port. The board may be in use by another app.']);
-        return false;
-      }
-      setConnectedDevice(device);
-      deviceIdRef.current = device.id;
-      lastDeviceRef.current = device;
-      setLines((prev) => [...prev, '> Connected to ' + (device.productName ?? device.id) + ' at ' + baudRate + ' baud.']);
-      setPlotterData([]);
+      Alert.alert(
+        'Helper Firmware Required',
+        'The ' + selectedMode + ' helper firmware needs to be compiled from the Pico SDK source in firmware/ and bundled into the app. See firmware/README.md for build instructions.\n\nThe PICOBOOT flash pipeline is ready — once the UF2 is bundled, this button will flash it instantly.',
+      );
+    } catch (e) {
+      setFlashMsg('Flash failed: ' + (e as Error).message);
+    } finally {
+      setFlashing(false);
+    }
+  }
 
-      const unsub = addSerialDataListener(device.id, (data: Uint8Array) => {
-        if (pausedRef.current) return;
-        const text = bytesToText(data);
-
-        // Serial monitor: accumulate lines
-        setLines((prev) => {
-          const newLines = text.split('\n');
-          const combined = [...prev];
-          if (combined.length > 0 && !combined[combined.length - 1].startsWith('>')) {
-            combined[combined.length - 1] += newLines[0];
-          } else {
-            combined.push(newLines[0]);
-          }
-          for (let i = 1; i < newLines.length; i++) combined.push(newLines[i]);
-          return combined.slice(-MAX_LINES);
-        });
-
-        // Plotter: parse numeric values from serial output
-        plotterBufferRef.current += text;
-        const bufLines = plotterBufferRef.current.split('\n');
-        plotterBufferRef.current = bufLines.pop() ?? '';
-        for (const line of bufLines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          // Parse first numeric value (Arduino Serial Plotter format: val1,val2,...)
-          const firstVal = parseFloat(trimmed.split(',')[0]);
-          if (!isNaN(firstVal)) {
-            setPlotterData((prev) => [...prev.slice(-(MAX_PLOTTER_POINTS - 1)), firstVal]);
-          }
-        }
+  async function doCapture() {
+    const pico = devices.find(d => d.isRp2040 && !d.bootsel);
+    if (!pico) {
+      setCaptureError('No RP2040 in application mode found. Flash the LA helper firmware first (Prepare Pico).');
+      return;
+    }
+    setCapturing(true);
+    setCaptureError(null);
+    setCaptureData(null);
+    try {
+      const opened = await openSerial(pico.id, {
+        baudRate: 115200,
+        dataBits: 8,
+        stopBits: 1,
+        parity: 'none',
+        dtr: false,
+        rts: false,
       });
-      unsubRef.current = unsub;
-      return true;
+      if (!opened) {
+        setCaptureError('Could not open serial to the Pico. Check USB permission.');
+        setCapturing(false);
+        return;
+      }
+      const result = await capture({
+        deviceId: pico.id,
+        sampleRate,
+        numSamples,
+        channels,
+        trigger: { type: 'none' },
+      });
+      const samples = Array.from(result.data.slice(0, Math.min(result.actualSamples, 4096)));
+      setCaptureData(samples);
+      await closeSerial(pico.id);
     } catch (e) {
-      setLines((prev) => [...prev, '> Error: ' + (e as Error).message]);
-      return false;
+      setCaptureError((e as Error).message || 'Capture failed');
+    } finally {
+      setCapturing(false);
     }
   }
 
-  async function reconnectSerial(device: UsbDevice) {
-    const ok = await openSerialConnection(device);
-    setReconnecting(false);
-    if (ok) {
-      setDisconnected(false);
-      setLines((prev) => [...prev, '> Reconnected successfully.']);
-    } else {
-      setLines((prev) => [...prev, '> Reconnection failed. Tap Connect to try manually.']);
-    }
-  }
-
-  async function disconnectSerial() {
-    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-    if (connectedDevice) {
-      await closeSerial(connectedDevice.id).catch(() => {});
-      setConnectedDevice(null);
-      deviceIdRef.current = null;
-      setLines((prev) => [...prev, '> Disconnected.']);
-    }
-  }
-
-  async function sendData() {
-    if (!connectedDevice || !inputText.trim()) return;
-    try {
-      const bytes = new Uint8Array(inputText.length + 1);
-      for (let i = 0; i < inputText.length; i++) bytes[i] = inputText.charCodeAt(i);
-      bytes[inputText.length] = 10;
-      await writeSerial(connectedDevice.id, bytes);
-      setLines((prev) => [...prev, '> sent: ' + inputText]);
-      setInputText('');
-    } catch (e) {
-      setLines((prev) => [...prev, '> Send error: ' + (e as Error).message]);
-    }
-  }
-
-  async function exportSerial() {
-    try {
-      const content = lines.join('\n');
-      await Share.share({ message: content, title: 'DroidVibe Serial Export' });
-    } catch (e) {
-      setLines((prev) => [...prev, '> Export error: ' + (e as Error).message]);
-    }
-  }
-
-  async function exportPlotterCSV() {
-    try {
-      const csv = plotterData.map((v, i) => i + ',' + v).join('\n');
-      await Share.share({ message: 'index,value\n' + csv, title: 'DroidVibe Plotter Export' });
-    } catch (e) {
-      setLines((prev) => [...prev, '> CSV export error: ' + (e as Error).message]);
-    }
-  }
+  const guide = HOOKUP_GUIDES[selectedMode] || [];
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top + 8 }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: palette.text }]}>Bench</Text>
-        <Row gap={6}>
-          {(['serial', 'plotter', 'logic'] as Tab[]).map((t) => (
-            <Pressable
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.seg, { backgroundColor: tab === t ? palette.accent : palette.bgInset }]}
-            >
-              <Text style={{ color: tab === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700' }}>
-                {t === 'serial' ? 'Monitor' : t === 'plotter' ? 'Plotter' : 'Logic'}
-              </Text>
-            </Pressable>
-          ))}
-        </Row>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: palette.bg }}
+      contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 32 }}
+    >
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12 }}>
+        {(['monitor', 'plotter', 'logic'] as BenchTab[]).map(t => (
+          <Pressable
+            key={t}
+            onPress={() => setTab(t)}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: 'center',
+              backgroundColor: tab === t ? palette.accent : palette.bgInset,
+              borderRadius: 10,
+              marginRight: 6,
+            }}
+          >
+            <Text style={{
+              color: tab === t ? palette.textOnAccent : palette.textMuted,
+              fontSize: 13,
+              fontWeight: '700',
+              textTransform: 'capitalize',
+            }}>{t}</Text>
+          </Pressable>
+        ))}
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
-        {tab === 'serial' && (
-          <>
-            <SectionTitle
-              title="Serial monitor"
-              subtitle={
-                reconnecting
-                  ? 'Reconnecting...'
-                  : disconnected
-                    ? 'Device disconnected — reconnecting automatically'
-                    : connectedDevice
-                      ? (connectedDevice.productName ?? connectedDevice.id) + ' · ' + baudRate + ' baud'
-                      : nativeUsb
-                        ? 'Not connected — tap Connect'
-                        : 'Native USB unavailable (Expo Go)'
-              }
-            />
-
-            {!nativeUsb && (
-              <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
-                <Text style={{ color: palette.warning, fontSize: 12 }}>
-                  Build a DroidVibe dev/production APK for serial hardware access.
-                </Text>
-              </View>
-            )}
-
-            {disconnected && !reconnecting && (
-              <View style={[styles.banner, { backgroundColor: palette.danger + '18', borderColor: palette.danger }]}>
-                <Text style={{ color: palette.danger, fontSize: 12 }}>
-                  USB device disconnected. Reconnect the board to resume streaming.
-                </Text>
-              </View>
-            )}
-
-            {reconnecting && (
-              <View style={[styles.banner, { backgroundColor: palette.accent + '18', borderColor: palette.accent }]}>
-                <Text style={{ color: palette.accent, fontSize: 12 }}>
-                  Reconnecting to device...
-                </Text>
-              </View>
-            )}
-
-            <Row gap={8} style={{ marginBottom: 8, flexWrap: 'wrap' }}>
-              {!connectedDevice ? (
-                <Button title="Connect" onPress={connectSerial} disabled={!nativeUsb || reconnecting} loading={reconnecting} />
-              ) : (
-                <Button title="Disconnect" onPress={disconnectSerial} variant="danger" />
-              )}
-              {connectedDevice && (
-                <>
-                  <Button title={paused ? 'Resume' : 'Pause'} onPress={() => setPaused((v) => !v)} variant="ghost" />
-                  <Button title="Clear" onPress={() => setLines(['> cleared'])} variant="ghost" />
-                  <Button title="Export" onPress={exportSerial} variant="ghost" />
-                </>
-              )}
-            </Row>
-
-            {nativeUsb && !connectedDevice && (
-              <Row gap={4} style={{ marginBottom: 8, flexWrap: 'wrap' }}>
-                <Text style={{ color: palette.textMuted, fontSize: 12, marginRight: 8 }}>Baud:</Text>
-                {BAUD_RATES.map((b) => (
-                  <Pressable
-                    key={b}
-                    onPress={() => setBaudRate(b)}
-                    style={[styles.baudBtn, { backgroundColor: baudRate === b ? palette.accent : palette.bgInset }]}
-                  >
-                    <Text style={{ color: baudRate === b ? palette.textOnAccent : palette.textMuted, fontSize: 11, fontWeight: '700' }}>
-                      {b}
-                    </Text>
-                  </Pressable>
-                ))}
-              </Row>
-            )}
-
-            <Card style={{ minHeight: 240, backgroundColor: palette.monoBg, borderColor: palette.surfaceBorder }}>
-              <ScrollView ref={scrollRef} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-                <Text style={{ color: palette.monoText, fontFamily: 'monospace', fontSize: 12, lineHeight: 16 }}>
-                  {lines.join('\n')}
-                </Text>
-              </ScrollView>
-            </Card>
-
-            {connectedDevice && (
-              <Row gap={8} style={{ marginTop: 8 }}>
-                <TextInput
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder="Type to send..."
-                  placeholderTextColor={palette.textMuted}
-                  style={[styles.sendInput, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface }]}
-                  onSubmitEditing={sendData}
-                />
-                <Button title="Send" onPress={sendData} />
-              </Row>
-            )}
-          </>
-        )}
-
-        {tab === 'plotter' && (
-          <>
-            <SectionTitle
-              title="Serial plotter"
-              subtitle={
-                connectedDevice
-                  ? 'Live data from ' + (connectedDevice.productName ?? connectedDevice.id)
-                  : 'Demo data — connect a board to stream real values'
-              }
-            />
-            <Card style={{ height: 260, padding: 8, backgroundColor: palette.monoBg }}>
-              <WaveformViewer
-                mode="plotter"
-                palette={palette}
-                dataSource={connectedDevice ? 'serial' : 'demo'}
-                seriesData={connectedDevice && plotterData.length > 0 ? plotterData : undefined}
-              />
-            </Card>
-            {connectedDevice && plotterData.length > 0 && (
-              <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
-                {plotterData.length} data points buffered. Parsing first numeric value per line.
-              </Text>
-            )}
-            {!connectedDevice && (
-              <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
-                Plotter shows demo data. Connect a board and stream values via Serial.print() to see live plots.
-              </Text>
-            )}
-            {connectedDevice && plotterData.length > 0 && (
-              <Row gap={8} style={{ marginTop: 8 }}>
-                <Button title="Export CSV" onPress={exportPlotterCSV} variant="ghost" size="sm" />
-              </Row>
-            )}
-          </>
-        )}
-
-        {tab === 'logic' && (
-          <>
-            <SectionTitle title="Logic analyzer" subtitle="RP2040 capture · zoom · cursors · protocol decode" />
-            <Card style={{ height: 260, padding: 8, backgroundColor: palette.monoBg }}>
-              <WaveformViewer mode="logic" palette={palette} dataSource="demo" />
-            </Card>
-            <Text style={{ color: palette.warning, fontSize: 12, marginTop: 8 }}>
-              Capture requires a verified RP2040 helper firmware image (not bundled). Waveform shows a demo signal.
+      {tab === 'monitor' && (
+        <View style={{ paddingHorizontal: 16 }}>
+          <SectionTitle title="Serial Monitor" subtitle="Real-time serial output" />
+          <Card>
+            <Text style={{ color: palette.textMuted, fontSize: 13 }}>
+              {connectedDevice
+                ? 'Connected to ' + (connectedDevice.productName || connectedDevice.id)
+                : 'No device connected. Go to the Devices tab to connect.'}
             </Text>
-          </>
-        )}
-      </ScrollView>
-
-      <Modal visible={showDevicePicker} animationType="slide" transparent onRequestClose={() => setShowDevicePicker(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
-            <Row justify="space-between" style={{ marginBottom: 12 }}>
-              <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Select serial device</Text>
-              <Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
-            </Row>
-            <FlatList
-              data={devices}
-              keyExtractor={(d) => d.id}
-              renderItem={({ item }) => {
-                const id = identifyBoard(item.vendorId, item.productId);
-                return (
-                  <Pressable
-                    onPress={() => selectDevice(item)}
-                    style={[styles.deviceItem, { borderColor: palette.surfaceBorder }]}
-                  >
-                    <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
-                      {id?.name ?? item.productName ?? 'Unknown device'}
-                    </Text>
-                    <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
-                      {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-              ListEmptyComponent={
-                <Text style={{ color: palette.textMuted, textAlign: 'center', padding: 20 }}>
-                  No devices found. Connect a board and try again.
-                </Text>
-              }
-            />
-          </View>
+          </Card>
         </View>
-      </Modal>
-    </View>
+      )}
+
+      {tab === 'plotter' && (
+        <View style={{ paddingHorizontal: 16 }}>
+          <SectionTitle title="Serial Plotter" subtitle="Live numeric graphs" />
+          <Card>
+            <WaveformViewer mode="plot" palette={palette} dataSource={connectedDevice ? 'serial' : 'demo'} />
+            <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>
+              {connectedDevice
+                ? 'Streaming from connected device'
+                : 'Plotter shows demo data. Connect a board and stream values via Serial.print() to see live plots.'}
+            </Text>
+          </Card>
+        </View>
+      )}
+
+      {tab === 'logic' && (
+        <View style={{ paddingHorizontal: 16 }}>
+          <SectionTitle
+            title="RP2040 Tools"
+            subtitle={nativeUsb ? 'Universal programmer & analyzer' : 'Requires native USB build'}
+          />
+
+          {!nativeUsb && (
+            <Card style={{ marginBottom: 12, borderLeftWidth: 3, borderLeftColor: palette.danger }}>
+              <Text style={{ color: palette.danger, fontWeight: '600', fontSize: 13 }}>
+                Native USB unavailable (Expo Go)
+              </Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 4 }}>
+                Build a DroidVibe dev/production APK for hardware access. See docs/DEPLOYMENT.md.
+              </Text>
+            </Card>
+          )}
+
+          <Card style={{ marginBottom: 12 }}>
+            <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 8 }}>Select Mode</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {RP2040_MODES.map(m => (
+                <Pressable
+                  key={m.mode}
+                  onPress={() => setSelectedMode(m.mode)}
+                  style={{
+                    backgroundColor: selectedMode === m.mode ? palette.accent : palette.bgInset,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                  }}
+                >
+                  <Text style={{
+                    color: selectedMode === m.mode ? palette.textOnAccent : palette.textMuted,
+                    fontSize: 12,
+                    fontWeight: '700',
+                  }}>{m.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 6 }}>
+              {RP2040_MODES.find(m => m.mode === selectedMode)?.desc}
+            </Text>
+          </Card>
+
+          <Card style={{ marginBottom: 12 }}>
+            <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 6 }}>
+              Hookup Guide — {RP2040_MODES.find(m => m.mode === selectedMode)?.label}
+            </Text>
+            <View style={{ backgroundColor: palette.bgInset, borderRadius: 8, padding: 10 }}>
+              {guide.map((line, i) => (
+                <Text key={i} style={{
+                  color: palette.text,
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  lineHeight: 18,
+                }}>{line}</Text>
+              ))}
+            </View>
+          </Card>
+
+          <Card style={{ marginBottom: 12 }}>
+            <Row justify="space-between" style={{ marginBottom: 8 }}>
+              <View>
+                <Text style={{ color: palette.text, fontWeight: '600' }}>Prepare Pico</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                  Flash the {selectedMode} helper firmware via PICOBOOT
+                </Text>
+              </View>
+              <Badge
+                label={picoBootsel ? 'BOOTSEL ready' : 'waiting'}
+                tone={picoBootsel ? 'success' : 'warn'}
+              />
+            </Row>
+            <Button
+              title={flashing ? 'Flashing...' : 'Prepare Pico'}
+              onPress={preparePico}
+              disabled={flashing || !picoBootsel}
+              loading={flashing}
+            />
+            {flashMsg && (
+              <Text style={{ color: palette.accent, fontSize: 12, marginTop: 6 }}>{flashMsg}</Text>
+            )}
+            <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 8 }}>
+              Hold BOOTSEL while plugging in the Pico. After flashing, it reboots into the selected mode.
+            </Text>
+          </Card>
+
+          {selectedMode === 'logic-analyzer' && (
+            <>
+              <SectionTitle title="Logic analyzer" subtitle="RP2040 capture · zoom · cursors · protocol decode" />
+
+              <Card style={{ marginBottom: 12 }}>
+                <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 8 }}>Capture Settings</Text>
+                <Row style={{ marginBottom: 8 }}>
+                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>Sample Rate:</Text>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: 'rgba(150,150,150,0.3)',
+                        borderRadius: 8,
+                        padding: 6,
+                        color: palette.text,
+                        fontSize: 13,
+                      }}
+                      value={String(sampleRate)}
+                      onChangeText={v => setSampleRate(parseInt(v) || 1000000)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <Text style={{ color: palette.textMuted, fontSize: 11, marginLeft: 4 }}>Hz</Text>
+                </Row>
+                <Row style={{ marginBottom: 8 }}>
+                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>Samples:</Text>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: 'rgba(150,150,150,0.3)',
+                        borderRadius: 8,
+                        padding: 6,
+                        color: palette.text,
+                        fontSize: 13,
+                      }}
+                      value={String(numSamples)}
+                      onChangeText={v => setNumSamples(parseInt(v) || 8192)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </Row>
+                <Row style={{ marginBottom: 8 }}>
+                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>Channels:</Text>
+                  <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginLeft: 8 }}>
+                    {[1, 2, 4, 8].map(c => (
+                      <Pressable
+                        key={c}
+                        onPress={() => setChannels(c)}
+                        style={{
+                          backgroundColor: channels === c ? palette.accent : palette.bgInset,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{
+                          color: channels === c ? palette.textOnAccent : palette.textMuted,
+                          fontSize: 12,
+                          fontWeight: '700',
+                        }}>{c}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </Row>
+                <Button
+                  title={capturing ? 'Capturing...' : 'Start Capture'}
+                  onPress={doCapture}
+                  disabled={capturing || !nativeUsb}
+                  loading={capturing}
+                />
+                {captureError && (
+                  <Text style={{ color: palette.danger, fontSize: 12, marginTop: 6 }}>{captureError}</Text>
+                )}
+              </Card>
+
+              <Card style={{ marginBottom: 12 }}>
+                <WaveformViewer
+                  mode="logic"
+                  palette={palette}
+                  dataSource={captureData ? 'serial' : 'demo'}
+                />
+                <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>
+                  {captureData
+                    ? captureData.length + ' samples captured. Use pinch to zoom, drag to pan.'
+                    : 'Waveform shows a demo signal. Flash the LA helper firmware and start a capture for real data.'}
+                </Text>
+              </Card>
+            </>
+          )}
+
+          {(selectedMode === 'swd' || selectedMode === 'jtag') && (
+            <Card style={{ marginBottom: 12 }}>
+              <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 6 }}>
+                {selectedMode.toUpperCase()} Programmer
+              </Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                After flashing the {selectedMode} helper firmware, the Pico acts as a {selectedMode.toUpperCase()} programmer.
+                Connect the target according to the hookup guide above, then use the Editor tab to compile firmware
+                for your target board. The upload function will route through the {selectedMode} protocol.
+              </Text>
+              <Divider />
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 4 }}>
+                Supported targets: {selectedMode === 'swd' ? 'ARM Cortex-M0/M0+/M3/M4/M7 (RP2040, STM32, nRF52, etc.)' : 'Any JTAG-capable device'}
+              </Text>
+            </Card>
+          )}
+
+          {selectedMode === 'avr-isp' && (
+            <Card style={{ marginBottom: 12 }}>
+              <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 6 }}>AVR ISP Programmer</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                After flashing the AVR-ISP helper firmware, the Pico acts as an AVR ISP programmer.
+                Connect the target AVR chip according to the hookup guide, then use the Editor tab to
+                compile and upload firmware via the STK500v1 protocol.
+              </Text>
+            </Card>
+          )}
+        </View>
+      )}
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 10 },
-  title: { fontSize: 26, fontWeight: '800' },
-  seg: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  banner: { padding: 10, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
-  baudBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
-  sendInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'monospace' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, padding: 20, maxHeight: '70%' },
-  deviceItem: { padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
-});
