@@ -13,6 +13,10 @@ import type {
   CaptureConfig,
   CaptureResult,
   UsbDevice,
+  HelperFirmwareRequest,
+  SwdTransferRequest,
+  JtagTransferRequest,
+  RP2040Mode,
 } from '@droidvibe/shared';
 
 export interface DroidVibeUsbModuleType {
@@ -27,6 +31,13 @@ export interface DroidVibeUsbModuleType {
   upload(request: UploadRequest, onProgress?: (p: UploadProgress) => void): Promise<UploadResult>;
   capture(config: CaptureConfig): Promise<CaptureResult>;
   flashUf2(deviceId: string, uf2Base64: string, verify: boolean): Promise<UploadResult>;
+  // ---- RP2040 multi-mode ----
+  flashHelperFirmware(request: HelperFirmwareRequest): Promise<UploadResult>;
+  enterBootselViaSerial(deviceId: string): Promise<boolean>;
+  swdTransfer(request: SwdTransferRequest): Promise<number>;
+  jtagTransfer(request: JtagTransferRequest): Promise<Uint8Array>;
+  isRp2040Bootsel(deviceId: string): Promise<boolean>;
+  getRp2040Mode(deviceId: string): Promise<{ mode: RP2040Mode; isRP2040: boolean }>;
 }
 
 interface RawNativeModule {
@@ -48,6 +59,12 @@ interface RawNativeModule {
   }): Promise<UploadResult>;
   capture(config: CaptureConfig): Promise<CaptureResult>;
   flashUf2(deviceId: string, uf2Base64: string, verify: boolean): Promise<UploadResult>;
+  flashHelperFirmware(request: HelperFirmwareRequest): Promise<UploadResult>;
+  enterBootselViaSerial(deviceId: string): Promise<boolean>;
+  swdTransfer(request: SwdTransferRequest): Promise<number>;
+  jtagTransfer(request: JtagTransferRequest): Promise<Uint8Array>;
+  isRp2040Bootsel(deviceId: string): Promise<boolean>;
+  getRp2040Mode(deviceId: string): Promise<{ mode: RP2040Mode; isRP2040: boolean }>;
   addListener(eventName: string, listener: (payload: any) => void): { remove(): void };
 }
 
@@ -122,6 +139,14 @@ export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
 
       capture: (config) => raw!.capture(config),
       flashUf2: (deviceId, uf2Base64, verify) => raw!.flashUf2(deviceId, uf2Base64, verify),
+
+      // RP2040 multi-mode
+      flashHelperFirmware: (request) => raw!.flashHelperFirmware(request),
+      enterBootselViaSerial: (deviceId) => raw!.enterBootselViaSerial(deviceId),
+      swdTransfer: (request) => raw!.swdTransfer(request),
+      jtagTransfer: (request) => raw!.jtagTransfer(request),
+      isRp2040Bootsel: (deviceId) => raw!.isRp2040Bootsel(deviceId),
+      getRp2040Mode: (deviceId) => raw!.getRp2040Mode(deviceId),
     };
 
     return wrapped;
