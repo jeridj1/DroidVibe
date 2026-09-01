@@ -141,7 +141,7 @@ export default function EditorScreen() {
     buildStageRef.current = buildStage;
   }, [buildStage]);
 
-  // Track code changes for undo history (debounced â only snapshots meaningful edits)
+  // Track code changes for undo history (debounced Ã¢ÂÂ only snapshots meaningful edits)
   useEffect(() => {
     if (code === lastCodeRef.current) return;
     const timer = setTimeout(() => {
@@ -209,7 +209,7 @@ export default function EditorScreen() {
     });
   }, []);
 
-  // USB disconnect detection â abort in-progress upload
+  // USB disconnect detection Ã¢ÂÂ abort in-progress upload
   useEffect(() => {
     if (!nativeUsb) return;
     const unsub = addDeviceListener((e) => {
@@ -290,7 +290,7 @@ export default function EditorScreen() {
     }
     if (!fw) return;
 
-    // Open device picker â filter to only permission-granted devices
+    // Open device picker Ã¢ÂÂ filter to only permission-granted devices
     const devs = await listDevices();
     const granted = devs.filter((d) => d.permission === 'granted');
     setDevices(granted);
@@ -342,7 +342,7 @@ export default function EditorScreen() {
     uploadDeviceRef.current = device;
     uploadAbortedRef.current = false;
 
-    // Board identification â explicit confirmed state
+    // Board identification Ã¢ÂÂ explicit confirmed state
     const id = identifyBoard(device.vendorId, device.productId);
     setIdentifiedBoard(id);
 
@@ -516,12 +516,12 @@ export default function EditorScreen() {
       {!nativeUsb && (
         <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
           <Text style={{ color: palette.warning, fontSize: 12, fontWeight: '600' }}>
-            Expo Go detected â native USB unavailable. Build a dev/production APK for hardware access.
+            Expo Go detected Ã¢ÂÂ native USB unavailable. Build a dev/production APK for hardware access.
           </Text>
         </View>
       )}
 
-      {/* Identified board state â explicit confirmed state */}
+      {/* Identified board state Ã¢ÂÂ explicit confirmed state */}
       {identifiedBoard && (
         <View style={[styles.boardIdBar, { backgroundColor: palette.accent + '12', borderColor: palette.accent + '40' }]}>
           <HardwareStatusBadge state="connected" />
@@ -530,7 +530,7 @@ export default function EditorScreen() {
               Board identified: {identifiedBoard.name}
             </Text>
             <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-              {identifiedBoard.protocol} â {identifiedBoard.fqbn}
+              {identifiedBoard.protocol} Ã¢ÂÂ {identifiedBoard.fqbn}
             </Text>
           </View>
         </View>
@@ -708,7 +708,7 @@ export default function EditorScreen() {
                         <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
                           {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
-                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
+                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? 'â'} Â· VID {item.vendorId} PID {item.productId}
                         </Text>
                       </View>                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
                     </Row>                    {id && (
@@ -856,6 +856,8 @@ const styles = StyleSheet.create({
   boardList: { paddingHorizontal: 12, paddingBottom: 8 },
   boardItem: { paddingVertical: 8, borderBottomWidth: 0.5, borderColor: 'rgba(150,150,150,0.2)' },
   bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
-  deviceItem: { paddingVertical: 10
-
-... [Content truncated]
+  deviceItem: { paddingVertical: 10, borderBottomWidth: 0.5 },
+  findInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14 },
+  modalContent: { borderRadius: 14, padding: 16, borderWidth: 1, margin: 16 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+});
