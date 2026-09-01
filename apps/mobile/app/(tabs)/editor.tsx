@@ -52,8 +52,7 @@ function failureSuggestion(message: string): string | null {
     return 'USB permission was denied. Go to the Devices tab and tap "Allow access".';
   }
   if (msg.includes('timeout') || msg.includes('handshake')) {
-    return 'The board did not respond. Press th
-e reset button and try again.';
+    return 'The board did not respond. Press the reset button and try again.';
   }
   if (msg.includes('verification') || msg.includes('verify')) {
     return 'Firmware was written but verification failed. The board may have an incompatible bootloader.';
@@ -105,8 +104,7 @@ export default function EditorScreen() {
   const [compiling, setCompiling] = useState(false);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [buildStage, setBuildStage] = useState<string>('idle');
-  const [uploadStageDetail, setUploadStageDetail] = useState<stri
-ng | null>(null);
+  const [uploadStageDetail, setUploadStageDetail] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [ai, setAi] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -143,11 +141,10 @@ ng | null>(null);
     buildStageRef.current = buildStage;
   }, [buildStage]);
 
-  // Track code changes for undo history (debounced — only snapshots meaningful edits)
+  // Track code changes for undo history (debounced â only snapshots meaningful edits)
   useEffect(() => {
     if (code === lastCodeRef.current) return;
-    const 
-timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       setHistory((prev) => [...prev.slice(-49), lastCodeRef.current]);
       setRedoStack([]);
       lastCodeRef.current = code;
@@ -212,13 +209,12 @@ timer = setTimeout(() => {
     });
   }, []);
 
-  // USB disconnect detection — abort in-progress upload
+  // USB disconnect detection â abort in-progress upload
   useEffect(() => {
     if (!nativeUsb) return;
     const unsub = addDeviceListener((e) => {
       if (e.type === 'detach' && uploadDeviceRef.current && e.device.id === uploadDeviceRef.current.id) {
-        if (uploading) 
-{
+        if (uploading) {
           uploadAbortedRef.current = true;
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setBuildStage('failed');
@@ -279,8 +275,7 @@ timer = setTimeout(() => {
 
   async function startUpload() {
     if (!nativeUsb) {
-  
-    setError('Native USB unavailable. Build a DroidVibe dev/production APK to access USB hardware.');
+      setError('Native USB unavailable. Build a DroidVibe dev/production APK to access USB hardware.');
       setErrorSuggestion(failureSuggestion('Native USB unavailable'));
       return;
     }
@@ -295,7 +290,7 @@ timer = setTimeout(() => {
     }
     if (!fw) return;
 
-    // Open device picker — filter to only permission-granted devices
+    // Open device picker â filter to only permission-granted devices
     const devs = await listDevices();
     const granted = devs.filter((d) => d.permission === 'granted');
     setDevices(granted);
@@ -332,8 +327,7 @@ timer = setTimeout(() => {
     } else {
       setBuildStage('failed');
       setUploadMsg(result.message);
-      setErrorSuggestion(failu
-reSuggestion(result.message));
+      setErrorSuggestion(failureSuggestion(result.message));
     }
   }
 
@@ -348,7 +342,7 @@ reSuggestion(result.message));
     uploadDeviceRef.current = device;
     uploadAbortedRef.current = false;
 
-    // Board identification — explicit confirmed state
+    // Board identification â explicit confirmed state
     const id = identifyBoard(device.vendorId, device.productId);
     setIdentifiedBoard(id);
 
@@ -392,8 +386,7 @@ reSuggestion(result.message));
             setProgress(p.progress);
             const newStage = STAGE_MAP[p.stage] ?? 'uploading';
             if (newStage !== buildStageRef.current) {
-              Lay
-outAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setBuildStage(newStage);
             }
             setUploadStageDetail(formatStageLabel(p.stage, protocol));
@@ -464,8 +457,7 @@ outAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
   }
 
-  asy
-nc function doSave() {
+  async function doSave() {
     setSaveState('saving');
     try {
       await saveLocalSketch({ name: sketchName, code, fqbn });
@@ -494,7 +486,7 @@ nc function doSave() {
             <Text style={{ color: palette.accent, marginLeft: 4 }}>{boardOpen ? '\u25B2' : '\u25BC'}</Text>
           </Row>
         </Pressable>
-        <Row gap={4} style={styles.toolbar}>
+        <View style={styles.toolbar}>
           <Button title="Undo" onPress={undo} disabled={history.length === 0} variant="ghost" size="sm" />
           <Button title="Redo" onPress={redo} disabled={redoStack.length === 0} variant="ghost" size="sm" />
           <Button title="Find" onPress={() => setShowFind(true)} variant="ghost" size="sm" />
@@ -517,20 +509,19 @@ nc function doSave() {
             onPress={startUpload}
             disabled={compiling || uploading}
             loading={uploading}
-       
-   />
-        </Row>
+          />
+        </View>
       </View>
 
       {!nativeUsb && (
         <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
           <Text style={{ color: palette.warning, fontSize: 12, fontWeight: '600' }}>
-            Expo Go detected — native USB unavailable. Build a dev/production APK for hardware access.
+            Expo Go detected â native USB unavailable. Build a dev/production APK for hardware access.
           </Text>
         </View>
       )}
 
-      {/* Identified board state — explicit confirmed state */}
+      {/* Identified board state â explicit confirmed state */}
       {identifiedBoard && (
         <View style={[styles.boardIdBar, { backgroundColor: palette.accent + '12', borderColor: palette.accent + '40' }]}>
           <HardwareStatusBadge state="connected" />
@@ -539,7 +530,7 @@ nc function doSave() {
               Board identified: {identifiedBoard.name}
             </Text>
             <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-              {identifiedBoard.protocol} — {identifiedBoard.fqbn}
+              {identifiedBoard.protocol} â {identifiedBoard.fqbn}
             </Text>
           </View>
         </View>
@@ -569,21 +560,22 @@ nc function doSave() {
       </View>
 
       <View style={[styles.bottomPanel, { backgroundColor: palette.bgElevated, borderColor: palette.surfaceBorder }]}>
-        <Row style={{ justifyContent
-: 'space-between', marginBottom: 6 }}>
+        <View style={styles.outputHeader}>
           <SectionTitle
             title="Output"
             subtitle={compiling ? 'Compiling...' : uploading ? 'Uploading...' : undefined}
           />
-          {(compiling || uploading) && <ActivityIndicator color={palette.accent} />}
-          {diagnostics.length > 0 && (
-            <Button title="Explain (AI)" onPress={doExplain} variant="ghost" size="sm" />
-          )}
-          {diagnostics.length > 0 && (
-            <Button title="Fix (AI)" onPress={doFix} disabled={aiLoading} variant="ghost" size="sm" />
-          )}
-          <Button title="Generate" onPress={() => setShowAiGen((v) => !v)} variant="ghost" size="sm" />
-        </Row>
+          <View style={styles.aiButtons}>
+            {(compiling || uploading) && <ActivityIndicator color={palette.accent} />}
+            {diagnostics.length > 0 && (
+              <Button title="Explain (AI)" onPress={doExplain} variant="ghost" size="sm" />
+            )}
+            {diagnostics.length > 0 && (
+              <Button title="Fix (AI)" onPress={doFix} disabled={aiLoading} variant="ghost" size="sm" />
+            )}
+            <Button title="Generate" onPress={() => setShowAiGen((v) => !v)} variant="ghost" size="sm" />
+          </View>
+        </View>
 
         <BuildStageBar stage={buildStage} progress={progress} palette={palette} />
 
@@ -618,8 +610,7 @@ nc function doSave() {
               <Card style={{ marginBottom: 6, padding: 10 }}>
                 <Row>
                   <Badge
-                    label={d.sev
-erity}
+                    label={d.severity}
                     tone={d.severity === 'error' ? 'danger' : d.severity === 'warning' ? 'warn' : 'neutral'}
                   />
                   <Text style={{ color: palette.text, marginLeft: 8, fontSize: 13 }}>
@@ -662,15 +653,14 @@ erity}
                 <Button                  title={aiLoading ? 'Generating...' : 'Generate'}
                   onPress={doGenerate}
       
-            disabled={
-aiLoading}
+            disabled={aiLoading}
                   loading={aiLoading}
                 />
               </Row>
             </Card>          )}
           {aiResult !== null && (
             <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.success }}>
-              <Row style={{ justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+              <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
                 <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>AI GENERATED CODE</Text>
                 <Button
                   title="Insert into editor"
@@ -703,8 +693,7 @@ aiLoading}
             <Row style={{ justifyContent: 'space-between', marginBottom: 12 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Select device</Text>
               
-<Button title="Cancel" o
-nPress={() => setShowDevicePicker(false)} variant="ghost" />
+<Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
             </Row>
             <FlatList              data={devices}
               keyExtractor={(d) => d.id}
@@ -719,7 +708,7 @@ nPress={() => setShowDevicePicker(false)} variant="ghost" />
                         <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
                           {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
-                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? ''} · VID {item.vendorId} PID {item.productId}
+                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
                         </Text>
                       </View>                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
                     </Row>                    {id && (
@@ -739,8 +728,7 @@ nPress={() => setShowDevicePicker(false)} variant="ghost" />
       </Modal>
 
       {/* Find & Replace modal */}
-      <Modal visible={showFind} animationType="slide" transparent onRequestClose={()
- => setShowFind(false)}>
+      <Modal visible={showFind} animationType="slide" transparent onRequestClose={() => setShowFind(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
             <Row justify="space-between" style={{ marginBottom: 12 }}>
@@ -772,8 +760,7 @@ nPress={() => setShowDevicePicker(false)} variant="ghost" />
 }
 
 function BuildStageBar({ stage, progress, palette }: { stage: string; progress: number; palette: any }) {
-  const stages = ['idle', 'compiling', 'connecting',
- 'uploading', 'verifying', 'verified'];
+  const stages = ['idle', 'compiling', 'connecting', 'uploading', 'verifying', 'verified'];
   const stageLabels: Record<string, string> = {
     idle: 'Idle',
     compiling: 'Compile',
@@ -830,15 +817,31 @@ function BuildStageBar({ stage, progress, palette }: { stage: string; progress: 
 }
 
 const styles = StyleSheet.create({
-  container: { flex
-: 1 },
+  container: { flex: 1 },
   header: {
     flexDirection: 'column',
     paddingHorizontal: 12,
     paddingBottom: 8,
-    gap: 6,
   },
-  toolbar: { flexWrap: 'wrap' },
+  toolbar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  outputHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  aiButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+  },
   banner: { marginHorizontal: 12, marginBottom: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
   boardIdBar: {
     flexDirection: 'row',
@@ -853,6 +856,6 @@ const styles = StyleSheet.create({
   boardList: { paddingHorizontal: 12, paddingBottom: 8 },
   boardItem: { paddingVertical: 8, borderBottomWidth: 0.5, borderColor: 'rgba(150,150,150,0.2)' },
   bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
-  deviceItem: { pad
+  deviceItem: { paddingVertical: 10
 
 ... [Content truncated]

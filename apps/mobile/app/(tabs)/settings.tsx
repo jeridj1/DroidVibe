@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '@/src/theme/ThemeProvider';
 import { Card, Badge, Row, SectionTitle, Button, Switch, Divider } from '@/src/components/ui';
 import { isNativeUsbAvailable } from '@/src/lib/transport';
-import { getApiUrl, setApiUrl as saveApiUrl, getAiModel, setAiModel as saveAiModel, getAiKey, setAiKey as saveAiKey, DEFAULT_AI_MODEL } from '@/src/lib/appConfig';
 import { invalidateApiBaseCache } from '@/src/lib/api';
+import { getApiUrl, setApiUrl, getAiModel, setAiModel, getAiKey, setAiKey, DEFAULT_AI_MODEL } from '@/src/lib/appConfig';
 import Constants from 'expo-constants';
 
 const AI_MODELS = [
@@ -14,43 +14,41 @@ const AI_MODELS = [
   'mistral-medium-latest',
   'mistral-small-latest',
   'open-mistral-nemo',
-  'open-mixtral-8x7b',
+  'open-codestral-mistral',
 ];
 
 export default function SettingsScreen() {
   const { palette, mode, setMode, textScale, setTextScale, twoPane, setTwoPane } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const [backendUrl, setBackendUrl] = useState('');
-  const [aiModel, setAiModel] = useState(DEFAULT_AI_MODEL);
-  const [aiKey, setAiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      setBackendUrl((await getApiUrl()) ?? '');
-      const m = await getAiModel();
-      if (m) setAiModel(m);
-      setAiKey((await getAiKey()) ?? '');
-    })();
-  }, []);
-
-  function persistBackendUrl(v: string) {
-    setBackendUrl(v);
-    saveApiUrl(v);
-    invalidateApiBaseCache();
-  }
-  function persistAiModel(v: string) {
-    setAiModel(v);
-    saveAiModel(v);
-  }
-  function persistAiKey(v: string) {
-    setAiKey(v);
-    saveAiKey(v);
-  }
-
   const themeOptions: ThemeMode[] = ['light', 'dark', 'system'];
   const version = Constants.expoConfig?.version ?? '1.0.0';
+  const [backendUrl, setBackendUrl] = useState('');
+  const [aiModel, setAiModelState] = useState(DEFAULT_AI_MODEL);
+  const [aiKey, setAiKeyState] = useState('');
+  const [showAiKey, setShowAiKey] = useState(false);
+
+  useEffect(() => {
+    getApiUrl().then(setBackendUrl);
+    getAiModel().then(setAiModelState);
+    getAiKey().then(setAiKeyState);
+  }, []);
+
+  async function persistBackendUrl(url: string) {
+    setBackendUrl(url);
+    await setApiUrl(url);
+    invalidateApiBaseCache();
+  }
+
+  async function persistAiModel(model: string) {
+    setAiModelState(model);
+    await setAiModel(model);
+  }
+
+  async function persistAiKey(key: string) {
+    setAiKeyState(key);
+    await setAiKey(key);
+  }
 
   function resetOnboarding() {
     Alert.alert(
@@ -85,8 +83,7 @@ export default function SettingsScreen() {
                 onPress={() => setMode(t)}
                 style={[styles.seg, { backgroundColor: mode === t ? palette.accent : palette.bgInset }]}
               >
-                <Text styl
-e={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
+                <Text style={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{t}</Text>
               </Pressable>
             ))}
           </Row>
@@ -121,67 +118,60 @@ e={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12,
           <Badge label="local only" tone="neutral" />
         </Row>
         <Divider />
-        <Button
-          title="Sign in"
-          onPress={() => Alert.alert('Sign in', 'Cloud sign-in is coming soon.')}
-          variant="ghost"
-        />
+        <Button title="Sign in" onPress={() => Alert.alert('Sign in', 'Coming soon!')} variant="ghost" size="sm" />
       </Card>
 
-      <SectionTitle title="AI & Backend" subtitle="Mistral AI model & server URL" />
+      <SectionTitle title="AI & Backend" subtitle="Mistral AI configuration" />
       <Card style={{ marginBottom: 12 }}>
-        <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
-        <TextInput
-          value={backendUrl}
-          onChangeText={persistBackendUrl}
-          placeholder="http://192.168.1.10:3001"
-          placeholderTextColor={palette.textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          style={[styles.input, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface }]}
-        />
-        <Divider />
-        <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>AI model</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {AI_MODELS.map((m) => (
-            <Pressable
-              key={m}
-              onPress={() => persistAiModel(m)}
-              style={[styles.seg, { backgroundColor: aiModel === m ? palette.accent : palette.bgInset }]}
-            >
-              <Text style={{ color: aiModel === m ? palette.textOnAccent : palette.textMuted, fontSize: 11, fontWeight: '700' }}>{m}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Divider />
-        <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Mistral API key</Text>
-        <Row style={{ alignItems: 'center' }}>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Backend URL</Text>
           <TextInput
-            value={aiKey}
-            onChangeText={persistAiKey}
-            placeholder="sk-..."
+            style={styles.input}
+            value={backendUrl}
+            onChangeText={persistBackendUrl}
+            placeholder="http://localhost:3001"
             placeholderTextColor={palette.textMuted}
-            secureTextEntry={!showKey}
             autoCapitalize="none"
             autoCorrect={false}
-            style={[styles.input, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface, flex: 1 }]}
           />
-          <Pressable onPress={() => setShowKey((v) => !v)} style={{ marginLeft: 8 }}>
-            <Text style={{ color: palette.accent, fontWeight: '700' }}>{showKey ? 'Hide' : 'Show'}</Text>
-          </Pressable>
-        </Row>
-        <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 6 }}>
-          Stored locally on-device. Used for AI explain / fix / generate features.
-        </Text>
+        </View>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>AI Model</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {AI_MODELS.map((m) => (
+              <Pressable
+                key={m}
+                onPress={() => persistAiModel(m)}
+                style={[styles.seg, { backgroundColor: aiModel === m ? palette.accent : palette.bgInset }]}
+              >
+                <Text style={{ color: aiModel === m ? palette.textOnAccent : palette.textMuted, fontSize: 11, fontWeight: '700' }}>{m}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View>
+          <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 4 }}>Mistral API Key</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={aiKey}
+              onChangeText={persistAiKey}
+              placeholder="optional — overrides server key"
+              placeholderTextColor={palette.textMuted}
+              secureTextEntry={!showAiKey}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Button title={showAiKey ? 'Hide' : 'Show'} onPress={() => setShowAiKey((v) => !v)} variant="ghost" size="sm" />
+          </View>
+        </View>
       </Card>
 
       <SectionTitle title="Diagnostics" subtitle="System health checks" />
       <Card style={{ marginBottom: 12 }}>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>Native USB module</Text>
-          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'
-} />
+          <Badge label={isNativeUsbAvailable() ? 'available' : 'unavailable'} tone={isNativeUsbAvailable() ? 'success' : 'warn'} />
         </Row>
         <Row justify="space-between" style={{ marginBottom: 8 }}>
           <Text style={{ color: palette.text, fontWeight: '600' }}>App version</Text>
@@ -224,8 +214,7 @@ e={{ color: mode === t ? palette.textOnAccent : palette.textMuted, fontSize: 12,
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>Stack</Text>
-          <Tex
-t style={{ color: palette.text }}>Expo · Hono · Turso</Text>
+          <Text style={{ color: palette.text }}>Expo · Hono · Turso</Text>
         </Row>
         <Row justify="space-between" style={{ marginTop: 8 }}>
           <Text style={{ color: palette.textMuted }}>USB protocols</Text>
@@ -243,5 +232,12 @@ t style={{ color: palette.text }}>Expo · Hono · Turso</Text>
 const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   seg: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  input: {
+    borderWidth: 1,
+    borderColor: 'rgba(150,150,150,0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
 });

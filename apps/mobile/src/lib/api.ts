@@ -10,38 +10,31 @@ const DEFAULT_BASE =
   ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
     'http://localhost:3001');
 
-const API_URL_KEY = '@droidvibe/api_url';
+let cachedBase: string | null = null;
 
-let apiBaseCache: string = DEFAULT_BASE;
-let apiBaseReady = false;
-
-/** Sync getter for the currently resolved backend base URL. */
 export function getApiBase(): string {
-  return apiBaseCache;
+  return cachedBase ?? DEFAULT_BASE;
 }
 
-/** Re-read the user-configured backend URL from AsyncStorage and refresh the cache. */
-export async function invalidateApiBaseCache(): Promise<void> {
+async function ensureApiBase(): Promise<string> {
+  if (cachedBase) return cachedBase;
   try {
-    const stored = await AsyncStorage.getItem(API_URL_KEY);
-    apiBaseCache = stored && stored.trim() ? stored : DEFAULT_BASE;
+    const stored = await AsyncStorage.getItem('@droidvibe/api_url');
+    cachedBase = stored || DEFAULT_BASE;
   } catch {
-    apiBaseCache = DEFAULT_BASE;
+    cachedBase = DEFAULT_BASE;
   }
-  apiBaseReady = true;
+  return cachedBase;
 }
 
-async function ensureApiBase(): Promise<void> {
-  if (!apiBaseReady) await invalidateApiBaseCache();
+export async function invalidateApiBaseCache(): Promise<void> {
+  cachedBase = null;
 }
-
-// Best-effort initial resolution on module load.
-invalidateApiBaseCache().catch(() => { /* ignore */ });
 
 async function rpc<T>(path: string, input: unknown): Promise<T> {
-  await ensureApiBase();
   try {
-    const res = await fetch(getApiBase() + '/rpc/' + path, {
+    const base = await ensureApiBase();
+    const res = await fetch(base + '/rpc/' + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: input ? JSON.stringify(input) : '{}',
@@ -81,7 +74,8 @@ export const api = {
   ai: {
     explainError: (input: unknown) => rpc('ai/explainError', input),
     generate: (input: { prompt: string; boardFqbn?: string }) => rpc('ai/generate', input),
-    fix: (input: unknown) => rpc('ai/fix', input),
+    fix: (input: unkno
+wn) => rpc('ai/fix', input),
   },
   examples: {
     list: () => rpc('examples/list', {}),
