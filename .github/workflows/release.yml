@@ -60,6 +60,30 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
 
+      - name: Verify native USB module is linked
+        working-directory: apps/mobile/android
+        run: |
+          echo "=== Checking settings.gradle for native-usb ==="
+          if grep -qi "native-usb\|nativeusb" settings.gradle 2>/dev/null; then
+            echo "✅ native-usb module found in settings.gradle"
+          else
+            echo "❌ native-usb module NOT found in settings.gradle!"
+            echo "=== Full settings.gradle ==="
+            cat settings.gradle
+            echo ""
+            echo "=== Running expo-modules-autolinking search ==="
+            cd ..
+            pnpm exec expo-modules-autolinking search --platform android 2>&1 || true
+            exit 1
+          fi
+          echo ""
+          echo "=== Checking app/build.gradle for native-usb dependency ==="
+          if grep -qi "native-usb\|nativeusb" app/build.gradle 2>/dev/null; then
+            echo "✅ native-usb dependency found in app/build.gradle"
+          else
+            echo "❌ native-usb dependency NOT found in app/build.gradle!"
+          fi
+
       - name: Patch build config
         working-directory: apps/mobile/android
         run: |
