@@ -10,6 +10,7 @@ pico_sdk_init()
 
 add_executable(droidvibe_swd main.c)
 
+target_compile_options(droidvibe_swd PRIVATE -include pico/bootrom.h)
 target_link_libraries(droidvibe_swd
     pico_stdlib
     hardware_gpio
