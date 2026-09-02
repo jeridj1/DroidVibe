@@ -1,18 +1,16 @@
 /**
  * Typed RPC client for the DroidVibe backend. Calls POST /rpc/<ns>/<proc>.
- * Falls back to a clear offline error when the backend is unreachable.
- *
- * AI features (explainError, generate, fix) work WITHOUT a backend when
- * the user provides an API key in Settings — calls go directly to the AI
- * provider from the phone via direct-ai.ts.
+ * Falls back to a local Termux backend when the configured remote service is
+ * empty, unreachable, or times out.
  */
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { directAi } from './direct-ai';
 
+const LOCAL_BASE = 'http://127.0.0.1:3001';
 const DEFAULT_BASE =
-  ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
-    'http://localhost:3001');
+  ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) || LOCAL_BASE).replace(/\/$/, '');
+const REQUEST_TIMEOUT_MS = 5000;
 
 let cachedBase: string | null = null;
 
@@ -23,10 +21,10 @@ export function getApiBase(): string {
 async function ensureApiBase(): Promise<string> {
   if (cachedBase) return cachedBase;
   try {
-    const stored = await AsyncStorage.getItem('@droidvibe/api_url');
-    cachedBase = stored || DEFAULT_BASE;
+    const stored = (await AsyncStorage.getItem('@droidvibe/api_url'))?.trim();
+    cachedBase = (stored || DEFAULT_BASE || LOCAL_BASE).replace(/\/$/, '');
   } catch {
-    cachedBase = DEFAULT_BASE;
+    cachedBase = DEFAULT_BASE || LOCAL_BASE;
   }
   return cachedBase;
 }
@@ -35,20 +33,40 @@ export async function invalidateApiBaseCache(): Promise<void> {
   cachedBase = null;
 }
 
-async function rpc<T>(path: string, input: unknown): Promise<T> {
+async function postRpc<T>(base: string, path: string, input: unknown): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const base = await ensureApiBase();
     const res = await fetch(base + '/rpc/' + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: input ? JSON.stringify(input) : '{}',
+      signal: controller.signal,
     });
     const json = (await res.json()) as { ok: boolean; data?: T; error?: string };
-    if (!json.ok) throw new Error(json.error ?? 'RPC error');
+    if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
     return json.data as T;
-  } catch (e) {
-    throw new Error('Backend unreachable: ' + (e as Error).message);
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+async function rpc<T>(path: string, input: unknown): Promise<T> {
+  const configured = await ensureApiBase();
+  const candidates = [configured, LOCAL_BASE].filter((base, index, all) => base && all.indexOf(base) === index);
+  let lastError: unknown = null;
+
+  for (const base of candidates) {
+    try {
+      const result = await postRpc<T>(base, path, input);
+      cachedBase = base;
+      return result;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  throw new Error('Backend unreachable: ' + (lastError as Error)?.message);
 }
 
 export const api = {
