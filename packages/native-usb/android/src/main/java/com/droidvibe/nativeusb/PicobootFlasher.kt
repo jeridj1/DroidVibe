@@ -37,78 +37,39 @@ object PicobootFlasher {
     data class Result(val ok: Boolean, val stage: String, val verified: Boolean, val message: String)
     private data class Uf2Block(val address: Int, val data: ByteArray)
 
-    fun flash(
-        usbManager: UsbManager,
-        device: UsbDevice,
-        uf2: ByteArray,
-        verify: Boolean,
-        onProgress: ProgressCb,
-    ): Result {
-        if (device.vendorId != BOOTSEL_VID || device.productId != BOOTSEL_PID) {
-            return Result(false, "failed", false, "Device is not an RP2040 in BOOTSEL mode")
-        }
-        val blocks = try { parseUf2(uf2) } catch (e: Exception) {
-            return Result(false, "failed", false, e.message ?: "Invalid UF2")
-        }
+    fun flash(usbManager: UsbManager, device: UsbDevice, uf2: ByteArray, verify: Boolean, onProgress: ProgressCb): Result {
+        if (device.vendorId != BOOTSEL_VID || device.productId != BOOTSEL_PID) return Result(false, "failed", false, "Device is not an RP2040 in BOOTSEL mode")
+        val blocks = try { parseUf2(uf2) } catch (e: Exception) { return Result(false, "failed", false, e.message ?: "Invalid UF2") }
         if (blocks.isEmpty()) return Result(false, "failed", false, "UF2 contains no flash blocks")
-
-        val conn = usbManager.openDevice(device)
-            ?: return Result(false, "failed", false, "openDevice failed")
-        val iface = findPicobootInterface(device)
-            ?: run { conn.close(); return Result(false, "failed", false, "PICOBOOT interface not found") }
-        if (!conn.claimInterface(iface, true)) {
-            conn.close(); return Result(false, "failed", false, "PICOBOOT interface could not be claimed")
-        }
-        val epOut = (0 until iface.endpointCount).map { iface.getEndpoint(it) }
-            .firstOrNull { it.type == UsbConstants.USB_ENDPOINT_XFER_BULK && it.direction == UsbConstants.USB_DIR_OUT }
-        val epIn = (0 until iface.endpointCount).map { iface.getEndpoint(it) }
-            .firstOrNull { it.type == UsbConstants.USB_ENDPOINT_XFER_BULK && it.direction == UsbConstants.USB_DIR_IN }
-        if (epOut == null || epIn == null) {
-            conn.releaseInterface(iface); conn.close()
-            return Result(false, "failed", false, "PICOBOOT bulk endpoints missing")
-        }
-
+        val conn = usbManager.openDevice(device) ?: return Result(false, "failed", false, "openDevice failed")
+        val iface = findPicobootInterface(device) ?: run { conn.close(); return Result(false, "failed", false, "PICOBOOT interface not found") }
+        if (!conn.claimInterface(iface, true)) { conn.close(); return Result(false, "failed", false, "PICOBOOT interface could not be claimed") }
+        val epOut = (0 until iface.endpointCount).map { iface.getEndpoint(it) }.firstOrNull { it.type == UsbConstants.USB_ENDPOINT_XFER_BULK && it.direction == UsbConstants.USB_DIR_OUT }
+        val epIn = (0 until iface.endpointCount).map { iface.getEndpoint(it) }.firstOrNull { it.type == UsbConstants.USB_ENDPOINT_XFER_BULK && it.direction == UsbConstants.USB_DIR_IN }
+        if (epOut == null || epIn == null) { conn.releaseInterface(iface); conn.close(); return Result(false, "failed", false, "PICOBOOT bulk endpoints missing") }
         try {
             onProgress("handshake", 0.0, "exclusive flash access")
-            if (!command(conn, epOut, epIn, PC_EXCLUSIVE_ACCESS, 1, byteArrayOf(2))) {
-                return Result(false, "failed", false, "PICOBOOT exclusive access failed")
-            }
+            if (!command(conn, epOut, epIn, PC_EXCLUSIVE_ACCESS, 1, byteArrayOf(2))) return Result(false, "failed", false, "PICOBOOT exclusive access failed")
             onProgress("handshake", 0.25, "exit XIP")
-            if (!command(conn, epOut, epIn, PC_EXIT_XIP, 0, null)) {
-                return Result(false, "failed", false, "PICOBOOT exit XIP failed")
-            }
-
-            val erases = blocks.map { it.address - FLASH_START }
-                .flatMap { listOf(it / SECTOR) }.distinct().sorted()
+            if (!command(conn, epOut, epIn, PC_EXIT_XIP, 0, null)) return Result(false, "failed", false, "PICOBOOT exit XIP failed")
+            val erases = blocks.map { it.address - FLASH_START }.map { it / SECTOR }.distinct().sorted()
             onProgress("erasing", 0.0, "erase flash sectors")
             for ((index, sector) in erases.withIndex()) {
                 val addr = FLASH_START + sector * SECTOR
-                if (!command(conn, epOut, epIn, PC_FLASH_ERASE, 8, rangeArgs(addr, SECTOR))) {
-                    return Result(false, "failed", false, "Flash erase failed at 0x" + addr.toString(16))
-                }
+                if (!command(conn, epOut, epIn, PC_FLASH_ERASE, 8, rangeArgs(addr, SECTOR))) return Result(false, "failed", false, "Flash erase failed at 0x" + addr.toString(16))
                 onProgress("erasing", (index + 1).toDouble() / erases.size, "sector " + sector)
             }
-
             for ((index, block) in blocks.withIndex()) {
                 onProgress("writing", index.toDouble() / blocks.size, "UF2 block " + (index + 1) + "/" + blocks.size)
-                if (block.data.size != PAGE) {
-                    return Result(false, "failed", false, "UF2 block payload must be 256 bytes")
-                }
-                if (!command(conn, epOut, epIn, PC_WRITE, 8, rangeArgs(block.address, PAGE), block.data)) {
-                    return Result(false, "failed", false, "Flash write failed at 0x" + block.address.toString(16))
-                }
+                if (block.data.size != PAGE) return Result(false, "failed", false, "UF2 block payload must be 256 bytes")
+                if (!command(conn, epOut, epIn, PC_WRITE, 8, rangeArgs(block.address, PAGE), block.data)) return Result(false, "failed", false, "Flash write failed at 0x" + block.address.toString(16))
             }
-
             var verified = false
             if (verify) {
                 onProgress("verifying", 0.0, "read back UF2 blocks")
                 verified = verifyBlocks(conn, epOut, epIn, blocks, onProgress)
-                if (!verified) {
-                    reboot(conn, epOut, epIn)
-                    return Result(false, "failed", false, "Verification mismatch")
-                }
+                if (!verified) { reboot(conn, epOut, epIn); return Result(false, "failed", false, "Verification mismatch") }
             }
-
             onProgress("handshake", 0.95, "reboot")
             reboot(conn, epOut, epIn)
             onProgress("done", 1.0, "flashed")
@@ -119,15 +80,7 @@ object PicobootFlasher {
         }
     }
 
-    private fun command(
-        conn: UsbDeviceConnection,
-        epOut: UsbEndpoint,
-        epIn: UsbEndpoint,
-        cmdId: Int,
-        cmdSize: Int,
-        args: ByteArray?,
-        payload: ByteArray? = null,
-    ): Boolean {
+    private fun command(conn: UsbDeviceConnection, epOut: UsbEndpoint, epIn: UsbEndpoint, cmdId: Int, cmdSize: Int, args: ByteArray?, payload: ByteArray? = null): Boolean {
         val token = synchronized(this) { nextToken++ }
         val header = ByteArray(32)
         putU32(header, 0, PICOBOOT_MAGIC)
@@ -137,12 +90,8 @@ object PicobootFlasher {
         putU32(header, 12, payload?.size ?: 0)
         if (args != null) System.arraycopy(args, 0, header, 16, minOf(args.size, 16))
         if (conn.bulkTransfer(epOut, header, header.size, 3000) != header.size) return false
-        if (payload != null && payload.isNotEmpty()) {
-            if (conn.bulkTransfer(epOut, payload, payload.size, 3000) != payload.size) return false
-        }
-        // The documented protocol completes an OUT command with a zero-length IN ACK.
-        val ack = ByteArray(1)
-        val ackResult = conn.bulkTransfer(epIn, ack, 0, 3000)
+        if (payload != null && payload.isNotEmpty()) if (conn.bulkTransfer(epOut, payload, payload.size, 3000) != payload.size) return false
+        val ackResult = conn.bulkTransfer(epIn, ByteArray(1), 0, 3000)
         if (ackResult < 0) return false
         return statusOk(conn, token)
     }
@@ -150,27 +99,18 @@ object PicobootFlasher {
     private fun statusOk(conn: UsbDeviceConnection, token: Int): Boolean {
         val status = ByteArray(16)
         val n = conn.controlTransfer(
-            UsbConstants.USB_DIR_IN or UsbConstants.USB_TYPE_VENDOR or UsbConstants.USB_RECIP_DEVICE,
+            UsbConstants.USB_DIR_IN or UsbConstants.USB_TYPE_VENDOR or 0,
             PICOBOOT_IF_CMD_STATUS, 0, 0, status, status.size, 1000,
         )
         if (n < 8) return true
-        val returnedToken = readU32(status, 0)
-        val statusCode = readU32(status, 4)
-        return returnedToken == token && statusCode == 0
+        return readU32(status, 0) == token && readU32(status, 4) == 0
     }
 
     private fun reboot(conn: UsbDeviceConnection, epOut: UsbEndpoint, epIn: UsbEndpoint) {
-        // dPC=0, dSP=0, dDelayMS=500
         command(conn, epOut, epIn, PC_REBOOT, 12, u32(0) + u32(0) + u32(500))
     }
 
-    private fun verifyBlocks(
-        conn: UsbDeviceConnection,
-        epOut: UsbEndpoint,
-        epIn: UsbEndpoint,
-        blocks: List<Uf2Block>,
-        onProgress: ProgressCb,
-    ): Boolean {
+    private fun verifyBlocks(conn: UsbDeviceConnection, epOut: UsbEndpoint, epIn: UsbEndpoint, blocks: List<Uf2Block>, onProgress: ProgressCb): Boolean {
         for ((index, block) in blocks.withIndex()) {
             val token = synchronized(this) { nextToken++ }
             val header = ByteArray(32)
@@ -189,8 +129,7 @@ object PicobootFlasher {
                 if (n <= 0) return false
                 offset += n
             }
-            if (!got.contentEquals(block.data)) return false
-            if (!statusOk(conn, token)) return false
+            if (!got.contentEquals(block.data) || !statusOk(conn, token)) return false
             onProgress("verifying", (index + 1).toDouble() / blocks.size, "block " + (index + 1))
         }
         return true
