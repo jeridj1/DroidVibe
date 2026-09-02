@@ -51,7 +51,7 @@ jobs:
               cat /tmp/tsc-output.txt
               echo '~~~'
             } > /tmp/tc-issue.md
-            gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
+            # gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true  # DISABLED to break feedback loop
             exit 1
           fi
       - name: Upload typecheck output
