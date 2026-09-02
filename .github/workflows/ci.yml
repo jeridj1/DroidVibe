@@ -74,10 +74,8 @@ jobs:
         with:
           version: 9.12.0
       - uses: actions/setup-node@v4
-    
-    with:
+        with:
           node-version: 22
-
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @droidvibe/web build
       - uses: actions/upload-artifact@v4
@@ -141,8 +139,7 @@ jobs:
               echo '~~~'
             } > /tmp/pb-issue.md
             gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/pb-issue.md || true
-   
-         exit 1
+            exit 1
           fi
 
   build-apk:
@@ -192,8 +189,7 @@ jobs:
             if grep -q 'android.kotlinVersion=' gradle.properties; then
               sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties
             else
-  
-            echo "android.kotlinVersion=1.9.25" >> gradle.properties
+              echo "android.kotlinVersion=1.9.25" >> gradle.properties
             fi
           else
             echo "android.kotlinVersion=1.9.25" > gradle.properties
@@ -231,8 +227,7 @@ jobs:
               fi
             fi
           fi
-          e
-cho "=== Final gradle.properties ==="
+          echo "=== Final gradle.properties ==="
           cat gradle.properties
       - name: Bundle JavaScript
         working-directory: apps/mobile
@@ -275,8 +270,7 @@ cho "=== Final gradle.properties ==="
         working-directory: apps/mobile/android
         run: |
           ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace 2>&1 | tee /tmp/build-output.txt
-      - name: Upload Andr
-oid APK
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: droidvibe-android-apk
