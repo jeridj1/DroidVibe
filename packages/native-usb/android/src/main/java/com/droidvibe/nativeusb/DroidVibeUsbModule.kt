@@ -300,6 +300,39 @@ class DroidVibeUsbModule : Module() {
             }
         }
 
+        // ---- RP2040 helper firmware flashing (from bundled Android asset) ----
+        AsyncFunction("flashHelperFirmwareFromAsset") { deviceId: String, assetPath: String, verify: Boolean, promise: Promise ->
+            try {
+                val device = findDevice(deviceId)
+                if (!usbManager.hasPermission(device)) {
+                    promise.reject("USB_NO_PERMISSION", "USB permission not granted", null)
+                    return@AsyncFunction
+                }
+                if (!RP2040Controller.isBootSel(device)) {
+                    promise.reject("USB_NOT_BOOTSEL", "Device is not in BOOTSEL mode. Hold BOOTSEL while plugging in the Pico.", null)
+                    return@AsyncFunction
+                }
+                val uf2 = appContext.reactContext?.assets?.open(assetPath)?.use { it.readBytes() }
+                    ?: throw Exception("Firmware asset not found: " + assetPath)
+                val result = PicobootFlasher.flash(usbManager, device, uf2, verify) { stage, progress, message ->
+                    sendEvent("onUploadProgress", mapOf(
+                        "deviceId" to deviceId,
+                        "stage" to stage,
+                        "progress" to progress,
+                        "message" to (message ?: ""),
+                    ))
+                }
+                promise.resolve(mapOf(
+                    "ok" to result.ok,
+                    "stage" to result.stage,
+                    "verified" to result.verified,
+                    "message" to result.message,
+                ))
+            } catch (e: Exception) {
+                promise.reject("USB_HELPER_FLASH_FAILED", e.message ?: "flashHelperFirmwareFromAsset failed", e)
+            }
+        }
+
         // ---- RP2040 enter BOOTSEL via serial command ----
         AsyncFunction("enterBootselViaSerial") { deviceId: String, promise: Promise ->
             try {

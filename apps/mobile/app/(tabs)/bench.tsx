@@ -18,6 +18,7 @@ import {
   closeSerial,
   capture,
   isNativeUsbAvailable,
+  flashHelperFirmwareFromAsset,
 } from '@/src/lib/transport';
 import type { UsbDevice, RP2040HelperMode } from '@droidvibe/shared';
 
@@ -30,6 +31,15 @@ const RP2040_MODES: { mode: RP2040HelperMode; label: string; desc: string }[] = 
   { mode: 'avr-isp', label: 'AVR ISP', desc: 'SPI ISP for AVR chips' },
   { mode: 'serial-bridge', label: 'Serial Bridge', desc: 'USB-serial passthrough' },
 ];
+
+/** Maps each RP2040 helper mode to its bundled firmware asset path. */
+const FIRMWARE_ASSET_PATHS: Record<RP2040HelperMode, string | null> = {
+  'logic-analyzer': 'firmware/logic_analyzer_helper.uf2',
+  'swd': 'firmware/swd_helper.uf2',
+  'jtag': 'firmware/jtag_helper.uf2',
+  'avr-isp': 'firmware/avr_isp_helper.uf2',
+  'serial-bridge': null, // Serial bridge works with default Pico firmware — no helper needed
+};
 
 const HOOKUP_GUIDES: Record<string, string[]> = {
   'logic-analyzer': [
@@ -114,13 +124,25 @@ export default function BenchScreen() {
       );
       return;
     }
+
+    const assetPath = FIRMWARE_ASSET_PATHS[selectedMode];
+    if (!assetPath) {
+      Alert.alert(
+        'No Firmware Needed',
+        'Serial Bridge mode works with the default Pico firmware. No helper firmware flashing is required.',
+      );
+      return;
+    }
+
     setFlashing(true);
     setFlashMsg('Flashing ' + selectedMode + ' helper firmware...');
     try {
-      Alert.alert(
-        'Helper Firmware Required',
-        'The ' + selectedMode + ' helper firmware needs to be compiled from the Pico SDK source in firmware/ and bundled into the app. See firmware/README.md for build instructions.\n\nThe PICOBOOT flash pipeline is ready — once the UF2 is bundled, this button will flash it instantly.',
-      );
+      const result = await flashHelperFirmwareFromAsset(pico.id, assetPath, true);
+      if (result.ok) {
+        setFlashMsg(selectedMode + ' firmware flashed successfully! Rebooting Pico...');
+      } else {
+        setFlashMsg('Flash failed: ' + result.message);
+      }
     } catch (e) {
       setFlashMsg('Flash failed: ' + (e as Error).message);
     } finally {

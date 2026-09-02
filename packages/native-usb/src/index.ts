@@ -33,6 +33,7 @@ export interface DroidVibeUsbModuleType {
   flashUf2(deviceId: string, uf2Base64: string, verify: boolean): Promise<UploadResult>;
   // ---- RP2040 multi-mode ----
   flashHelperFirmware(request: HelperFirmwareRequest): Promise<UploadResult>;
+  flashHelperFirmwareFromAsset(deviceId: string, assetPath: string, verify: boolean): Promise<UploadResult>;
   enterBootselViaSerial(deviceId: string): Promise<boolean>;
   swdTransfer(request: SwdTransferRequest): Promise<number>;
   jtagTransfer(request: JtagTransferRequest): Promise<Uint8Array>;
@@ -60,6 +61,7 @@ interface RawNativeModule {
   capture(config: CaptureConfig): Promise<CaptureResult>;
   flashUf2(deviceId: string, uf2Base64: string, verify: boolean): Promise<UploadResult>;
   flashHelperFirmware(request: HelperFirmwareRequest): Promise<UploadResult>;
+  flashHelperFirmwareFromAsset(deviceId: string, assetPath: string, verify: boolean): Promise<UploadResult>;
   enterBootselViaSerial(deviceId: string): Promise<boolean>;
   swdTransfer(request: SwdTransferRequest): Promise<number>;
   jtagTransfer(request: JtagTransferRequest): Promise<Uint8Array>;
@@ -142,6 +144,7 @@ export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
 
       // RP2040 multi-mode
       flashHelperFirmware: (request) => raw!.flashHelperFirmware(request),
+      flashHelperFirmwareFromAsset: (deviceId, assetPath, verify) => raw!.flashHelperFirmwareFromAsset(deviceId, assetPath, verify),
       enterBootselViaSerial: (deviceId) => raw!.enterBootselViaSerial(deviceId),
       swdTransfer: (request) => raw!.swdTransfer(request),
       jtagTransfer: (request) => raw!.jtagTransfer(request),

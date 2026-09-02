@@ -82,11 +82,21 @@ export async function capture(config: CaptureConfig): Promise<CaptureResult> {
 
 // ---- RP2040 multi-mode functions ----
 
-/** Flash helper firmware onto an RP2040 in BOOTSEL mode. */
+/** Flash helper firmware onto an RP2040 in BOOTSEL mode (from base64 UF2). */
 export async function flashHelperFirmware(
   request: HelperFirmwareRequest,
 ): Promise<UploadResult> {
   if (native) return native.flashHelperFirmware(request);
+  return { ok: false, stage: 'failed', verified: false, message: 'Native USB unavailable (Expo Go).' };
+}
+
+/** Flash helper firmware onto an RP2040 in BOOTSEL mode (from a bundled Android asset). */
+export async function flashHelperFirmwareFromAsset(
+  deviceId: string,
+  assetPath: string,
+  verify: boolean = true,
+): Promise<UploadResult> {
+  if (native) return native.flashHelperFirmwareFromAsset(deviceId, assetPath, verify);
   return { ok: false, stage: 'failed', verified: false, message: 'Native USB unavailable (Expo Go).' };
 }
 
