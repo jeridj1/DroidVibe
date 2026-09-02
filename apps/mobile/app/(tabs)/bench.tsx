@@ -66,8 +66,7 @@ const HOOKUP_GUIDES: Record<string, string[]> = {
   ],
   'serial-bridge': [
     'GP0 -> target RX',
-    'GP1 -> ta
-rget TX',
+    'GP1 -> target TX',
     'GND -> target GND',
   ],
 };
@@ -120,8 +119,7 @@ export default function BenchScreen() {
     try {
       Alert.alert(
         'Helper Firmware Required',
-        'The ' + selectedMode + ' helper firmware needs to be compiled from the Pi
-co SDK source in firmware/ and bundled into the app. See firmware/README.md for build instructions.\n\nThe PICOBOOT flash pipeline is ready — once the UF2 is bundled, this button will flash it instantly.',
+        'The ' + selectedMode + ' helper firmware needs to be compiled from the Pico SDK source in firmware/ and bundled into the app. See firmware/README.md for build instructions.\n\nThe PICOBOOT flash pipeline is ready — once the UF2 is bundled, this button will flash it instantly.',
       );
     } catch (e) {
       setFlashMsg('Flash failed: ' + (e as Error).message);
@@ -184,8 +182,7 @@ co SDK source in firmware/ and bundled into the app. See firmware/README.md for 
             onPress={() => setTab(t)}
             style={{
               flex: 1,
-            
-  paddingVertical: 10,
+              paddingVertical: 10,
               alignItems: 'center',
               backgroundColor: tab === t ? palette.accent : palette.bgInset,
               borderRadius: 10,
@@ -237,8 +234,7 @@ co SDK source in firmware/ and bundled into the app. See firmware/README.md for 
           />
 
           {!nativeUsb && (
-            <Card style={{ marginBottom: 12, borderLeftWidth: 3, borderLe
-ftColor: palette.danger }}>
+            <Card style={{ marginBottom: 12, borderLeftWidth: 3, borderLeftColor: palette.danger }}>
               <Text style={{ color: palette.danger, fontWeight: '600', fontSize: 13 }}>
                 Native USB unavailable (Expo Go)
               </Text>
@@ -281,8 +277,7 @@ ftColor: palette.danger }}>
             </Text>
             <View style={{ backgroundColor: palette.bgInset, borderRadius: 8, padding: 10 }}>
               {guide.map((line, i) => (
-                <Text key={i} sty
-le={{
+                <Text key={i} style={{
                   color: palette.text,
                   fontFamily: 'monospace',
                   fontSize: 11,
@@ -328,8 +323,7 @@ le={{
                 <Row style={{ marginBottom: 8 }}>
                   <Text style={{ color: palette.textMuted, fontSize: 12 }}>Sample Rate:</Text>
                   <View style={{ flex: 1, marginLeft: 8 }}>
-                
-    <TextInput
+                    <TextInput
                       style={{
                         borderWidth: 1,
                         borderColor: 'rgba(150,150,150,0.3)',
@@ -371,8 +365,7 @@ le={{
                         key={c}
                         onPress={() => setChannels(c)}
                         style={{
-                          backgroundColor: channels === c ? palette.accent : pal
-ette.bgInset,
+                          backgroundColor: channels === c ? palette.accent : palette.bgInset,
                           paddingHorizontal: 10,
                           paddingVertical: 5,
                           borderRadius: 8,
@@ -419,8 +412,7 @@ ette.bgInset,
                 {selectedMode.toUpperCase()} Programmer
               </Text>
               <Text style={{ color: palette.textMuted, fontSize: 12 }}>
-           
-     After flashing the {selectedMode} helper firmware, the Pico acts as a {selectedMode.toUpperCase()} programmer.
+                After flashing the {selectedMode} helper firmware, the Pico acts as a {selectedMode.toUpperCase()} programmer.
                 Connect the target according to the hookup guide above, then use the Editor tab to compile firmware
                 for your target board. The upload function will route through the {selectedMode} protocol.
               </Text>
