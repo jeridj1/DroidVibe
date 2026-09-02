@@ -53,7 +53,8 @@ object PicobootFlasher {
         ) {
             return Result(false, "failed", false, "Device is not an RP2040 in BOOTSEL mode")
         }
-        onProgress("handshake", 0.0, "claim PICOBOOT interface")
+        onProgress("handshake", 0.0,
+ "claim PICOBOOT interface")
         val conn = usbManager.openDevice(device)
             ?: return Result(false, "failed", false, "openDevice failed")
         val iface = findPicobootInterface(device)
@@ -90,7 +91,8 @@ object PicobootFlasher {
                 onProgress("writing", off.toDouble() / flat.size, "page " + (off / PAGE))
                 val chunk = flat.copyOfRange(off, minOf(off + PAGE, flat.size))
                 val addr = RP2040_FLASH_START + off
-                if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_WRITE, addr, chunk.size))) {
+                if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_WRITE,
+ addr, chunk.size))) {
                     return Result(false, "failed", false, "Write header not acked at 0x" + addr.toString(16))
                 }
                 if (conn.bulkTransfer(epOut, chunk, chunk.size, 2000) != chunk.size) {
@@ -185,7 +187,8 @@ object PicobootFlasher {
         return true
     }
 
-    // ---- UF2 parsing (in Kotlin; mirrors shared uf2.ts) ----
+    // ---- UF2 parsing (in Kotlin; mirrors shared uf
+2.ts) ----
 
     private fun flattenUf2(uf2: ByteArray): ByteArray {
         if (uf2.size % 512 != 0) throw IllegalArgumentException("UF2 size not a multiple of 512")
@@ -231,7 +234,8 @@ object PicobootFlasher {
         return out
     }
 
-    private fun findPicobootInterface(device: UsbDevice): UsbInterface? {
+    private fun findPicobootInterface(device:
+ UsbDevice): UsbInterface? {
         // PICOBOOT uses a vendor-specific interface (class 0xff) with bulk endpoints.
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)

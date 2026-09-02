@@ -53,7 +53,8 @@ object RP2040Controller {
 
     data class CaptureResult(
         val actualSamples: Int,
-        val durationUs: Long,
+ 
+       val durationUs: Long,
         val data: ByteArray,
         val sampleRate: Int,
         val channels: Int,
@@ -165,7 +166,8 @@ object RP2040Controller {
         apDp: Int,
         addr: Int,
         data: Int,
-    ): Int {
+    ): Int 
+{
         val cmd = ByteBuffer.allocate(10).order(ByteOrder.LITTLE_ENDIAN)
         cmd.put(if (isRead) CMD_SWD_READ else CMD_SWD_WRITE)
         cmd.put(apDp.toByte())
