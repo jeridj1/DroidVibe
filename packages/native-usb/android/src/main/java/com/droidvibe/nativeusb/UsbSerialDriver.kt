@@ -11,9 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * USB serial driver supporting CDC-ACM and bridge chips CH340/CP210x/FTDI.
- */
+/** USB serial driver supporting CDC-ACM and bridge chips CH340/CP210x/FTDI. */
 class UsbSerialDriver(
     private val usbManager: UsbManager,
     private val device: UsbDevice,
@@ -31,6 +29,7 @@ class UsbSerialDriver(
     private val driverKind: String = detectDriver()
 
     fun open(baudRate: Int, dataBits: Int, stopBits: Int, parity: String, dtr: Boolean, rts: Boolean): Boolean {
+        close()
         val conn = usbManager.openDevice(device) ?: run {
             Log.e(TAG, "openDevice returned null")
             return false
@@ -54,18 +53,38 @@ class UsbSerialDriver(
             close()
             return false
         }
-        setControlLines(dtr, rts)
+        if (!setControlLines(dtr, rts)) {
+            Log.w(TAG, "setControlLines was not acknowledged by $driverKind")
+        }
         readQueue.clear()
         running.set(true)
-        readThread = Thread { readLoop() }.apply { isDaemon = true; name = "droidvibe-serial-read"; start() }
+        readThread = Thread { readLoop() }.apply {
+            isDaemon = true
+            name = "droidvibe-serial-read"
+            start()
+        }
+        return true
+    }
+
+    /**
+     * Perform the standard RP2040 USB CDC 1200-baud touch.
+     * The device is opened at 1200 baud with DTR low, then the interface is
+     * released and the USB connection is closed. RP2040 USB stdio firmware
+     * uses this disconnect transition to reboot into BOOTSEL.
+     */
+    fun touch1200(): Boolean {
+        if (driverKind != "cdc-acm") return false
+        close()
+        if (!open(1200, 8, 1, "none", false, false)) return false
+        Thread.sleep(50)
+        close()
         return true
     }
 
     fun write(data: ByteArray): Int {
         val conn = connection ?: return -1
         val ep = outEp ?: return -1
-        val n = conn.bulkTransfer(ep, data, data.size, 1000)
-        return if (n >= 0) n else -1
+        return conn.bulkTransfer(ep, data, data.size, 1000).let { if (it >= 0) it else -1 }
     }
 
     @Synchronized
@@ -80,17 +99,14 @@ class UsbSerialDriver(
         return out.toByteArray()
     }
 
-    fun setDtrRts(dtr: Boolean, rts: Boolean) {
-        setControlLines(dtr, rts)
-    }
+    fun setDtrRts(dtr: Boolean, rts: Boolean): Boolean = setControlLines(dtr, rts)
 
-    fun drainInput() {
-        readQueue.clear()
-    }
+    fun drainInput() { readQueue.clear() }
 
     fun close() {
         running.set(false)
         runCatching { readThread?.interrupt() }
+        readThread = null
         iface?.let { connection?.releaseInterface(it) }
         runCatching { connection?.close() }
         connection = null
@@ -102,37 +118,38 @@ class UsbSerialDriver(
 
     private fun readLoop() {
         val buf = ByteArray(4096)
-        val conn = connection ?: return
-        val ep = inEp ?: return
         while (running.get()) {
+            val conn = connection ?: break
+            val ep = inEp ?: break
             val n = conn.bulkTransfer(ep, buf, buf.size, 100)
             if (n > 0) {
-                onData(buf.copyOfRange(0, n))
-                for (i in 0 until n) { readQueue.offer(buf[i]) }
+                val data = buf.copyOfRange(0, n)
+                onData(data)
+                for (b in data) readQueue.offer(b)
             }
         }
     }
 
     private fun setLineCoding(baudRate: Int, dataBits: Int, stopBits: Int, parity: String): Boolean {
-        val conn = connection ?: return false
         val coding = encodeLineCoding(baudRate, dataBits, stopBits, parity)
         return when (driverKind) {
             "cdc-acm" -> controlOut(0x21, 0x20, 0, 0, coding)
-            "ch340" -> controlOut(0x40, 0xA1 or 0x9C, 0x9C00 or encodeCh340Baud(baudRate), 0, null) || controlOut(0x40, 0xA4, if (dataBits == 8) 0x03 else 0x00, 0, null)
+            "ch340" -> controlOut(0x40, 0xA1 or 0x9C, 0x9C00 or encodeCh340Baud(baudRate), 0, null) ||
+                controlOut(0x40, 0xA4, if (dataBits == 8) 0x03 else 0x00, 0, null)
             "cp210x" -> controlOut(0x41, 0x03, 0x0000, 0, coding)
             "ftdi" -> controlOut(0x40, 0x03, encodeFtdiBaud(baudRate), 0, null)
             else -> controlOut(0x21, 0x20, 0, 0, coding)
         }
     }
 
-    private fun setControlLines(dtr: Boolean, rts: Boolean) {
-        val conn = connection ?: return
+    private fun setControlLines(dtr: Boolean, rts: Boolean): Boolean {
         val value = (if (dtr) 1 else 0) or (if (rts) 2 else 0)
-        when (driverKind) {
+        return when (driverKind) {
             "cdc-acm" -> controlOut(0x21, 0x22, value, 0, null)
             "ch340" -> controlOut(0xA1, 0xA4, value, 0, null)
             "cp210x" -> controlOut(0x41, 0x07, value, 0, null)
             "ftdi" -> controlOut(0x40, 0x01, 0x00FF or (value shl 8), 0, null)
+            else -> false
         }
     }
 
@@ -149,18 +166,13 @@ class UsbSerialDriver(
         b[1] = ((baud shr 8) and 0xff).toByte()
         b[2] = ((baud shr 16) and 0xff).toByte()
         b[3] = ((baud shr 24) and 0xff).toByte()
-        b[4] = if (stopBits == 2) 2.toByte() else 0.toByte()
-        b[5] = when (parity) { "even" -> 2.toByte(); "odd" -> 1.toByte(); else -> 0.toByte() }
+        b[4] = if (stopBits == 2) 2 else 0
+        b[5] = when (parity) { "even" -> 2; "odd" -> 1; else -> 0 }
         b[6] = dataBits.toByte()
         return b
     }
 
-    private fun encodeCh340Baud(baud: Int): Int {
-        return when (baud) {
-            9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600 -> baud
-            else -> baud
-        }
-    }
+    private fun encodeCh340Baud(baud: Int): Int = baud
 
     private fun encodeFtdiBaud(baud: Int): Int {
         val div = (3_000_000 / baud - 1).coerceAtLeast(0)
