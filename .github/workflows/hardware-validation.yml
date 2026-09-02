@@ -1,0 +1,104 @@
+name: DroidVibe Hardware Validation
+
+on:
+  push:
+    branches: [hardware-validation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    name: Build RP2040 helper firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cmake
+      - name: Install Pico SDK
+        run: git clone --depth 1 --recurse-submodules https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+      - name: Build helpers
+        env:
+          PICO_SDK_PATH: /tmp/pico-sdk
+        run: |
+          set -e
+          mkdir -p firmware-out
+          build_one() {
+            proj="$1"; exe="$2"; out="$3"
+            mkdir -p "firmware/$proj/build"
+            (cd "firmware/$proj/build" && cmake .. -DPICO_SDK_PATH="$PICO_SDK_PATH" && cmake --build . --parallel)
+            test -s "firmware/$proj/build/$exe.uf2"
+            cp "firmware/$proj/build/$exe.uf2" "firmware-out/$out.uf2"
+          }
+          build_one logic_analyzer droidvibe_la logic_analyzer_helper
+          build_one swd droidvibe_swd swd_helper
+          build_one jtag droidvibe_jtag jtag_helper
+          build_one avr_isp droidvibe_avr_isp avr_isp_helper
+          ls -lh firmware-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-firmware
+          path: firmware-out/*.uf2
+          if-no-files-found: error
+          retention-days: 30
+
+  apk:
+    name: Build standalone Android APK
+    needs: firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'cmake;3.22.1'
+      - run: pnpm install --no-frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: droidvibe-firmware
+          path: firmware-out
+      - name: Prepare bundled firmware assets
+        run: |
+          mkdir -p apps/mobile/src/main/assets/firmware
+          cp firmware-out/*.uf2 apps/mobile/src/main/assets/firmware/
+          ls -lh apps/mobile/src/main/assets/firmware
+      - name: Generate Android project
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+      - name: Verify native USB module
+        run: test -f packages/native-usb/android/build.gradle
+      - name: Build APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace
+      - name: Verify standalone bundle and firmware are packaged
+        run: |
+          APK=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -E 'assets/.+\.bundle' >/tmp/bundle.txt
+          unzip -l "$APK" | grep -E 'assets/firmware/.+\.uf2' >/tmp/firmware.txt
+          cat /tmp/bundle.txt
+          cat /tmp/firmware.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-standalone-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
