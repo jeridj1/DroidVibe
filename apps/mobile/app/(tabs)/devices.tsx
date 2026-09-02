@@ -38,8 +38,8 @@ export default function DevicesScreen() {
           <Text style={[styles.title, { color: palette.text }]}>Devices</Text>
           <Text style={{ color: palette.textMuted, fontSize: 13 }}>
             {native
-              ? devices.length + ' connected · ' + identifiedCount + ' identified'
-              : 'Expo Go — native USB unavailable'}
+              ? devices.length + ' connected - ' + identifiedCount + ' identified'
+              : 'Native USB unavailable'}
           </Text>
         </View>
         <Button title="Rescan" onPress={refresh} variant="ghost" />
@@ -49,9 +49,9 @@ export default function DevicesScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
         ListEmptyComponent={
           <EmptyState
-            icon="🔌"
+            icon="USB"
             title="No USB devices detected"
-            subtitle={native ? 'Connect a board via USB-OTG cable.' : 'Build a DroidVibe dev/production APK to access native USB.'}
+            subtitle={native ? 'Connect a board via USB OTG cable.' : 'Build a DroidVibe development or production APK to access native USB.'}
           />
         }
         data={devices}
@@ -66,7 +66,7 @@ export default function DevicesScreen() {
                     {id?.name ?? item.productName ?? 'Unknown device'}
                   </Text>
                   <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
-                    {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
+                    {item.manufacturer ?? 'Unknown'} - VID {item.vendorId} PID {item.productId}
                   </Text>
                 </View>
                 <Badge label={item.bootsel ? 'BOOTSEL' : item.driver} tone={item.bootsel ? 'accent' : 'neutral'} />
@@ -111,7 +111,7 @@ export default function DevicesScreen() {
 
               {item.bootsel && (
                 <Text style={{ color: palette.accent, fontSize: 11, marginTop: 6 }}>
-                  RP2040 in BOOTSEL — ready for PICOBOOT flashing.
+                  RP2040 in BOOTSEL - ready for PICOBOOT flashing.
                 </Text>
               )}
             </Card>
