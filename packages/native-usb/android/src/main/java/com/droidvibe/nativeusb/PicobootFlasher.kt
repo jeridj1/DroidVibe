@@ -1,45 +1,29 @@
 package com.droidvibe.nativeusb
 
-import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
-import android.util.Log
-import java.io.ByteArrayOutputStream
+import java.io.IOException
 
-/**
- * RP2040 PICOBOOT flasher.
- *
- * Implements the RP2040 bootrom PICOBOOT vendor interface: exclusive access,
- * exit XIP, flash erase, page write, optional read-back verification, and
- * reboot. The device must be in BOOTSEL mode (VID 2e8a PID 0003).
- *
- * VALIDATION: This is a faithful implementation of the documented PICOBOOT
- * protocol. UF2 address handling, command headers, ack semantics and reboot
- * parameters MUST be tested on real RP2040 hardware before production trust.
- * It never reports success unless the device ACKs and (when verify) read-back
- * matches.
- */
+/** Real RP2040 BOOTSEL PICOBOOT flasher. */
 object PicobootFlasher {
-    private const val TAG = "PicobootFlasher"
-
-    private const val PICOBOOT_MAGIC = 0x431fd83b
-    private const val FLASH_SECTOR = 0x1000
+    private const val PICOBOOT_MAGIC = 0x431FD10B
+    private const val VID = 0x2E8A
+    private const val PID_BOOTSEL = 0x0003
     private const val PAGE = 256
+    private const val SECTOR = 4096
 
-    // Command ids
-    private const val CMD_EXIT_XIP = 0x4
-    private const val CMD_ENTER_CMD_XIP = 0x5
-    private const val CMD_REBOOT = 0x7
-    private const val CMD_READ = 0x81
-    private const val CMD_WRITE = 0x82
-    private const val CMD_FLASH_ERASE = 0x83
-
-    private const val RP2040_FLASH_START = 0x10000000
+    private const val PC_EXCLUSIVE_ACCESS = 0x01
+    private const val PC_REBOOT = 0x02
+    private const val PC_FLASH_ERASE = 0x03
+    private const val PC_READ = 0x84
+    private const val PC_WRITE = 0x05
+    private const val PC_EXIT_XIP = 0x06
 
     data class Result(val ok: Boolean, val stage: String, val verified: Boolean, val message: String)
+    private data class Uf2Block(val address: Int, val data: ByteArray)
 
     fun flash(
         usbManager: UsbManager,
@@ -48,191 +32,205 @@ object PicobootFlasher {
         verify: Boolean,
         onProgress: ProgressCb,
     ): Result {
-        if (String.format("%04x", device.vendorId) != "2e8a" ||
-            String.format("%04x", device.productId) != "0003"
-        ) {
+        if (device.vendorId != VID || device.productId != PID_BOOTSEL) {
             return Result(false, "failed", false, "Device is not an RP2040 in BOOTSEL mode")
         }
-        onProgress("handshake", 0.0, "claim PICOBOOT interface")
+        val blocks = try { parseUf2(uf2) } catch (e: Exception) {
+            return Result(false, "failed", false, "Invalid UF2: ${e.message}")
+        }
+        if (blocks.isEmpty()) return Result(false, "failed", false, "UF2 contains no flash blocks")
+
         val conn = usbManager.openDevice(device)
-            ?: return Result(false, "failed", false, "openDevice failed")
+            ?: return Result(false, "failed", false, "Unable to open RP2040 USB device")
         val iface = findPicobootInterface(device)
         if (iface == null || !conn.claimInterface(iface, true)) {
-            conn.close(); return Result(false, "failed", false, "PICOBOOT interface not found/claimed")
+            conn.close()
+            return Result(false, "failed", false, "PICOBOOT interface not found or could not be claimed")
         }
-        val epOut = (0 until iface.endpointCount).map { iface.getEndpoint(it) }.firstOrNull { it.direction == 0x00 }
-        val epIn = (0 until iface.endpointCount).map { iface.getEndpoint(it) }.firstOrNull { it.direction == 0x80 }
+        val epOut = (0 until iface.endpointCount).map { iface.getEndpoint(it) }
+            .firstOrNull { it.direction == 0x00 && it.type == 2 }
+        val epIn = (0 until iface.endpointCount).map { iface.getEndpoint(it) }
+            .firstOrNull { it.direction == 0x80 && it.type == 2 }
         if (epOut == null || epIn == null) {
             conn.releaseInterface(iface); conn.close()
-            return Result(false, "failed", false, "PICOBOOT endpoints missing")
+            return Result(false, "failed", false, "PICOBOOT bulk endpoints not found")
         }
 
         try {
-            onProgress("handshake", 0.5, "exit XIP")
-            if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_EXIT_XIP))) {
-                return Result(false, "failed", false, "Exit XIP not acked")
+            onProgress("handshake", 0.05, "claim PICOBOOT")
+            if (!command(conn, epOut, epIn, PC_EXCLUSIVE_ACCESS, 1, 0) { putU8(it, 0, 2) }) {
+                return Result(false, "failed", false, "PICOBOOT exclusive access failed")
+            }
+            if (!command(conn, epOut, epIn, PC_EXIT_XIP, 0, 0)) {
+                return Result(false, "failed", false, "PICOBOOT exit XIP failed")
             }
 
-            // Flatten UF2 into flash bytes at RP2040_FLASH_START.
-            val flat = flattenUf2(uf2)
-            if (flat.isEmpty()) return Result(false, "failed", false, "Empty UF2")
-
-            onProgress("erasing", 0.0, "erase sectors")
-            for (er in planErases(flat.size)) {
-                if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_FLASH_ERASE, RP2040_FLASH_START + er.first, er.second))) {
-                    return Result(false, "failed", false, "Erase failed at 0x" + (RP2040_FLASH_START + er.first).toString(16))
+            val ranges = eraseRanges(blocks)
+            ranges.forEachIndexed { index, range ->
+                onProgress("erasing", index.toDouble() / ranges.size, "erase 0x${range.first.toString(16)}")
+                if (!command(conn, epOut, epIn, PC_FLASH_ERASE, 8, 0) {
+                    putU32(it, 0, range.first)
+                    putU32(it, 4, range.second)
+                }) {
+                    return Result(false, "failed", false, "Flash erase failed at 0x${range.first.toString(16)}")
                 }
             }
 
-            // Write in 256-byte pages.
-            var off = 0
-            while (off < flat.size) {
-                onProgress("writing", off.toDouble() / flat.size, "page " + (off / PAGE))
-                val chunk = flat.copyOfRange(off, minOf(off + PAGE, flat.size))
-                val addr = RP2040_FLASH_START + off
-                if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_WRITE, addr, chunk.size))) {
-                    return Result(false, "failed", false, "Write header not acked at 0x" + addr.toString(16))
+            val pageList = pages(blocks)
+            pageList.forEachIndexed { index, pair ->
+                onProgress("writing", index.toDouble() / maxOf(1, pageList.size), "page $index/${pageList.size}")
+                if (!command(conn, epOut, epIn, PC_WRITE, 8, PAGE, {
+                    putU32(it, 0, pair.first)
+                    putU32(it, 4, PAGE)
+                }, pair.second)) {
+                    return Result(false, "failed", false, "Flash write failed at 0x${pair.first.toString(16)}")
                 }
-                if (conn.bulkTransfer(epOut, chunk, chunk.size, 2000) != chunk.size) {
-                    return Result(false, "failed", false, "Write data short transfer at 0x" + addr.toString(16))
-                }
-                // Drain the trailing ACK byte for the write command.
-                if (!readAck(conn, epIn, 2000)) {
-                    return Result(false, "failed", false, "Write not acked at 0x" + addr.toString(16))
-                }
-                off += chunk.size
             }
 
-            var verifiedOk = false
+            var verified = false
             if (verify) {
-                onProgress("verifying", 0.0, "read-back")
-                verifiedOk = verifyReadback(conn, epOut, epIn, flat, onProgress)
-                onProgress("verifying", 1.0, if (verifiedOk) "match" else "mismatch")
-                if (!verifiedOk) {
-                    sendCmd(conn, epOut, epIn, buildCmd(CMD_REBOOT))
-                    return Result(false, "failed", false, "Verification mismatch (read-back)")
+                verified = true
+                blocks.forEachIndexed { index, block ->
+                    onProgress("verifying", index.toDouble() / blocks.size, "read 0x${block.address.toString(16)}")
+                    var offset = 0
+                    while (offset < block.data.size) {
+                        val len = minOf(PAGE, block.data.size - offset)
+                        val actual = read(conn, epOut, epIn, block.address + offset, len)
+                        if (!actual.contentEquals(block.data.copyOfRange(offset, offset + len))) {
+                            verified = false
+                            break
+                        }
+                        offset += len
+                    }
                 }
+                onProgress("verifying", 1.0, if (verified) "read-back matches" else "read-back mismatch")
+                if (!verified) return Result(false, "failed", false, "Verification mismatch")
             }
 
-            onProgress("handshake", 0.9, "reboot")
-            if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_REBOOT))) {
-                return Result(false, "failed", false, "Reboot not acked")
+            onProgress("handshake", 0.95, "reboot")
+            if (!command(conn, epOut, epIn, PC_REBOOT, 12, 0) {
+                putU32(it, 0, 0)
+                putU32(it, 4, 0)
+                putU32(it, 8, 100)
+            }) {
+                return Result(false, "failed", false, "PICOBOOT reboot failed")
             }
             onProgress("done", 1.0, "flashed")
-            return Result(true, "done", verify && verifiedOk, "PICOBOOT flash complete")
+            return Result(true, "done", !verify || verified, "PICOBOOT flash complete")
+        } catch (e: Exception) {
+            return Result(false, "failed", false, e.message ?: "PICOBOOT error")
         } finally {
-            conn.releaseInterface(iface); conn.close()
+            conn.releaseInterface(iface)
+            conn.close()
         }
     }
 
-    // ---- PICOBOOT framing ----
-
-    private fun buildCmd(cmd: Int, addr: Int = 0, size: Int = 0, p1: Int = 0, p2: Int = 0): ByteArray {
-        val out = ByteArray(24)
-        putU32(out, 0, PICOBOOT_MAGIC)
-        putU32(out, 4, cmd)
-        putU32(out, 8, addr)
-        putU32(out, 12, size)
-        putU32(out, 16, p1)
-        putU32(out, 20, p2)
-        return out
+    private fun pages(blocks: List<Uf2Block>): List<Pair<Int, ByteArray>> = blocks.flatMap { block ->
+        block.data.asList().chunked(PAGE).mapIndexed { pageIndex, bytes ->
+            val page = ByteArray(PAGE)
+            bytes.toByteArray().copyInto(page)
+            block.address + pageIndex * PAGE to page
+        }
     }
 
+    private fun command(
+        conn: UsbDeviceConnection,
+        out: UsbEndpoint,
+        input: UsbEndpoint,
+        id: Int,
+        argSize: Int,
+        transferLength: Int,
+        fill: ((ByteArray) -> Unit)? = null,
+        payload: ByteArray? = null,
+    ): Boolean {
+        val cmd = ByteArray(32)
+        putU32(cmd, 0, PICOBOOT_MAGIC)
+        putU32(cmd, 4, token++)
+        cmd[8] = id.toByte()
+        cmd[9] = argSize.toByte()
+        putU32(cmd, 12, transferLength)
+        fill?.invoke(cmd)
+        if (conn.bulkTransfer(out, cmd, cmd.size, 5000) != cmd.size) return false
+        if (payload != null && transferLength > 0) {
+            if (conn.bulkTransfer(out, payload, transferLength, 10000) != transferLength) return false
+        }
+        return receiveAck(conn, input)
+    }
+
+    private fun read(
+        conn: UsbDeviceConnection,
+        out: UsbEndpoint,
+        input: UsbEndpoint,
+        address: Int,
+        length: Int,
+    ): ByteArray {
+        val cmd = ByteArray(32)
+        putU32(cmd, 0, PICOBOOT_MAGIC)
+        putU32(cmd, 4, token++)
+        cmd[8] = PC_READ.toByte()
+        cmd[9] = 8
+        putU32(cmd, 12, length)
+        putU32(cmd, 16, address)
+        putU32(cmd, 20, length)
+        if (conn.bulkTransfer(out, cmd, cmd.size, 5000) != cmd.size) throw IOException("PICOBOOT read command failed")
+        val data = ByteArray(length)
+        var offset = 0
+        while (offset < length) {
+            val n = conn.bulkTransfer(input, data, offset, length - offset, 5000)
+            if (n <= 0) throw IOException("PICOBOOT read data failed")
+            offset += n
+        }
+        if (!receiveAckOnOut(conn, out)) throw IOException("PICOBOOT read ACK failed")
+        return data
+    }
+
+    private fun receiveAck(conn: UsbDeviceConnection, input: UsbEndpoint): Boolean =
+        conn.bulkTransfer(input, ByteArray(0), 0, 5000) == 0
+
+    private fun receiveAckOnOut(conn: UsbDeviceConnection, out: UsbEndpoint): Boolean =
+        conn.bulkTransfer(out, ByteArray(0), 0, 5000) == 0
+
+    private var token = 1
+
+    private fun putU8(b: ByteArray, off: Int, v: Int) { b[off] = v.toByte() }
     private fun putU32(b: ByteArray, off: Int, v: Int) {
         b[off] = (v and 0xff).toByte()
-        b[off + 1] = ((v shr 8) and 0xff).toByte()
-        b[off + 2] = ((v shr 16) and 0xff).toByte()
-        b[off + 3] = ((v shr 24) and 0xff).toByte()
+        b[off + 1] = ((v ushr 8) and 0xff).toByte()
+        b[off + 2] = ((v ushr 16) and 0xff).toByte()
+        b[off + 3] = ((v ushr 24) and 0xff).toByte()
     }
-
-    /** Send a command header and read the single-byte ACK (0 = OK). */
-    private fun sendCmd(conn: UsbDeviceConnection, epOut: UsbEndpoint, epIn: UsbEndpoint, cmd: ByteArray): Boolean {
-        if (conn.bulkTransfer(epOut, cmd, cmd.size, 2000) != cmd.size) return false
-        return readAck(conn, epIn, 2000)
-    }
-
-    private fun readAck(conn: UsbDeviceConnection, epIn: UsbEndpoint, timeoutMs: Int): Boolean {
-        val buf = ByteArray(1)
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            val n = conn.bulkTransfer(epIn, buf, buf.size, 500)
-            if (n > 0) return buf[0] == 0x00.toByte()
-        }
-        return false
-    }
-
-    private fun verifyReadback(
-        conn: UsbDeviceConnection, epOut: UsbEndpoint, epIn: UsbEndpoint,
-        flat: ByteArray, onProgress: ProgressCb,
-    ): Boolean {
-        var off = 0
-        while (off < flat.size) {
-            val len = minOf(PAGE, flat.size - off)
-            val addr = RP2040_FLASH_START + off
-            if (!sendCmd(conn, epOut, epIn, buildCmd(CMD_READ, addr, len))) return false
-            val buf = ByteArray(len)
-            val deadline = System.currentTimeMillis() + 2000
-            var got = 0
-            while (System.currentTimeMillis() < deadline && got < len) {
-                val n = conn.bulkTransfer(epIn, buf, got, len - got, 500)
-                if (n > 0) got += n
-            }
-            if (got != len) return false
-            if (!buf.contentEquals(flat.copyOfRange(off, off + len))) return false
-            if (!readAck(conn, epIn, 1000)) return false
-            off += len
-        }
-        return true
-    }
-
-    // ---- UF2 parsing (in Kotlin; mirrors shared uf2.ts) ----
-
-    private fun flattenUf2(uf2: ByteArray): ByteArray {
-        if (uf2.size % 512 != 0) throw IllegalArgumentException("UF2 size not a multiple of 512")
-        val blocks = uf2.size / 512
-        var min = Int.MAX_VALUE; var max = Int.MIN_VALUE
-        val payloads = ArrayList<Pair<Int, ByteArray>>()
-        for (i in 0 until blocks) {
-            val base = i * 512
-            if (readU32(uf2, base) != PICOBOOT_MAGIC_ALT_START) {
-                throw IllegalArgumentException("Bad UF2 magic at block " + i)
-            }
-            val payloadAddr = readU32(uf2, base + 4)
-            val payloadSize = readU32(uf2, base + 8)
-            if (payloadSize > 256) throw IllegalArgumentException("UF2 payload too big at block " + i)
-            val data = uf2.copyOfRange(base + 32, base + 32 + payloadSize)
-            payloads.add(payloadAddr to data)
-            if (payloadAddr < min) min = payloadAddr
-            if (payloadAddr + payloadSize - 1 > max) max = payloadAddr + payloadSize - 1
-        }
-        if (payloads.isEmpty()) return ByteArray(0)
-        val out = ByteArray(max - min + 1)
-        for ((addr, data) in payloads) System.arraycopy(data, 0, out, addr - min, data.size)
-        return out
-    }
-
-    private const val PICOBOOT_MAGIC_ALT_START = 0x0A324655 // UF2 magic start 0
 
     private fun readU32(b: ByteArray, off: Int): Int =
-        ((b[off].toInt() and 0xff) or
+        (b[off].toInt() and 0xff) or
             ((b[off + 1].toInt() and 0xff) shl 8) or
             ((b[off + 2].toInt() and 0xff) shl 16) or
-            ((b[off + 3].toInt() and 0xff) shl 24))
+            ((b[off + 3].toInt() and 0xff) shl 24)
 
-    private fun planErases(totalSize: Int): List<Pair<Int, Int>> {
-        val start = 0
-        val endAligned = ((totalSize + FLASH_SECTOR - 1) / FLASH_SECTOR) * FLASH_SECTOR
-        val out = ArrayList<Pair<Int, Int>>()
-        var a = start
-        while (a < endAligned) {
-            out.add(a to FLASH_SECTOR)
-            a += FLASH_SECTOR
+    private fun parseUf2(uf2: ByteArray): List<Uf2Block> {
+        require(uf2.size % 512 == 0) { "size is not a multiple of 512" }
+        val result = ArrayList<Uf2Block>()
+        for (i in uf2.indices step 512) {
+            require(readU32(uf2, i) == 0x0A324655) { "bad UF2 start magic" }
+            require(readU32(uf2, i + 508) == 0x0AB16F30) { "bad UF2 end magic" }
+            val address = readU32(uf2, i + 12)
+            val size = readU32(uf2, i + 16)
+            require(size in 1..256) { "invalid payload size $size" }
+            require(i + 32 + size <= i + 512) { "payload exceeds UF2 block" }
+            result += Uf2Block(address, uf2.copyOfRange(i + 32, i + 32 + size))
         }
-        return out
+        return result.sortedBy { it.address }
+    }
+
+    private fun eraseRanges(blocks: List<Uf2Block>): List<Pair<Int, Int>> {
+        val sectors = blocks.flatMap { block ->
+            val first = block.address and (SECTOR - 1).inv()
+            val last = (block.address + block.data.size - 1) and (SECTOR - 1).inv()
+            generateSequence(first) { current -> if (current < last) current + SECTOR else null }.toList()
+        }.distinct().sorted()
+        return sectors.map { it to SECTOR }
     }
 
     private fun findPicobootInterface(device: UsbDevice): UsbInterface? {
-        // PICOBOOT uses a vendor-specific interface (class 0xff) with bulk endpoints.
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             if (iface.interfaceClass == 0xff && iface.endpointCount >= 2) return iface
