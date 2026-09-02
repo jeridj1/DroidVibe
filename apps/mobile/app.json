@@ -27,7 +27,7 @@
         "backgroundColor": "#00979D"
       }
     },
-    "plugins": [],
+    "plugins": ["./plugins/withStandaloneDebugBundle"],
     "experiments": {
       "tsrPaths": true
     },
