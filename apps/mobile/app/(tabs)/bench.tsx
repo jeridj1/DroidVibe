@@ -66,7 +66,8 @@ const HOOKUP_GUIDES: Record<string, string[]> = {
   ],
   'serial-bridge': [
     'GP0 -> target RX',
-    'GP1 -> target TX',
+    'GP1 -> ta
+rget TX',
     'GND -> target GND',
   ],
 };
@@ -119,7 +120,8 @@ export default function BenchScreen() {
     try {
       Alert.alert(
         'Helper Firmware Required',
-        'The ' + selectedMode + ' helper firmware needs to be compiled from the Pico SDK source in firmware/ and bundled into the app. See firmware/README.md for build instructions.\n\nThe PICOBOOT flash pipeline is ready — once the UF2 is bundled, this button will flash it instantly.',
+        'The ' + selectedMode + ' helper firmware needs to be compiled from the Pi
+co SDK source in firmware/ and bundled into the app. See firmware/README.md for build instructions.\n\nThe PICOBOOT flash pipeline is ready — once the UF2 is bundled, this button will flash it instantly.',
       );
     } catch (e) {
       setFlashMsg('Flash failed: ' + (e as Error).message);
@@ -182,7 +184,8 @@ export default function BenchScreen() {
             onPress={() => setTab(t)}
             style={{
               flex: 1,
-              paddingVertical: 10,
+            
+  paddingVertical: 10,
               alignItems: 'center',
               backgroundColor: tab === t ? palette.accent : palette.bgInset,
               borderRadius: 10,
@@ -234,7 +237,8 @@ export default function BenchScreen() {
           />
 
           {!nativeUsb && (
-            <Card style={{ marginBottom: 12, borderLeftWidth: 3, borderLeftColor: palette.danger }}>
+            <Card style={{ marginBottom: 12, borderLeftWidth: 3, borderLe
+ftColor: palette.danger }}>
               <Text style={{ color: palette.danger, fontWeight: '600', fontSize: 13 }}>
                 Native USB unavailable (Expo Go)
               </Text>
@@ -277,7 +281,8 @@ export default function BenchScreen() {
             </Text>
             <View style={{ backgroundColor: palette.bgInset, borderRadius: 8, padding: 10 }}>
               {guide.map((line, i) => (
-                <Text key={i} style={{
+                <Text key={i} sty
+le={{
                   color: palette.text,
                   fontFamily: 'monospace',
                   fontSize: 11,
@@ -292,7 +297,7 @@ export default function BenchScreen() {
               <View>
                 <Text style={{ color: palette.text, fontWeight: '600' }}>Prepare Pico</Text>
                 <Text style={{ color: palette.textMuted, fontSize: 12 }}>
-                  Flash the {selectedMode} helper firmware via PICOBOOT>
+                  Flash the {selectedMode} helper firmware via PICOBOOT
                 </Text>
               </View>
               <Badge
@@ -323,7 +328,8 @@ export default function BenchScreen() {
                 <Row style={{ marginBottom: 8 }}>
                   <Text style={{ color: palette.textMuted, fontSize: 12 }}>Sample Rate:</Text>
                   <View style={{ flex: 1, marginLeft: 8 }}>
-                    <TextInput
+                
+    <TextInput
                       style={{
                         borderWidth: 1,
                         borderColor: 'rgba(150,150,150,0.3)',
@@ -340,4 +346,103 @@ export default function BenchScreen() {
                   <Text style={{ color: palette.textMuted, fontSize: 11, marginLeft: 4 }}>Hz</Text>
                 </Row>
                 <Row style={{ marginBottom: 8 }}>
-                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>Samples0ݑաи(         񙥕܁͑屔��ٱՠ耄ЁՅɝŹ1ՙШ u��         1QաѥفՐ(          ͑屔��           ɽɑՉ]őѠ耄Ш           ɽɑՉݱ݈耝ɝɄԀЄԀЄԀЀ،ĜШ           ɽɑՉIőŕ̨ Ш           EёŹܨШ           ͽѽȨAűՑєّաа(           ٽّMũԨ̰(          ��          YűՔ��ɥٜyյMŵqՌŴ(          ݹEٝՑաе혀��Ց9յMŵqՌAŉ͕%ِXā񰀠Ĥȥ��         ͕剽ŉё偔􉹕Օɥ̈(          ܸ(         𽙥՜𨀀       𽉽ܸ(        񉽜Mѥє��ՅɝŹ	ݑѽԨ u��        1QաЁ͑屔��ͽѽȨAűՑєّաѵՑՐЁٽّMũԨȁ��Eٹձ̨𽑕ᐸ(         񙥕܁͑屔��ٱՠ耄ЁٱաŉՍѥݸ耝ɽܜЁٱա]Ʌ(݉ŀܰ]ŀ耐ЁՅɝŹ1ՙШ u��         mlİЀа!tٵŀL4ퟂ�           񁉕͍ŉє(           ͕䵭ʹ(           ݹAɕ͌��4ퟄ�эEٹձ̡̥��          ͑屔��            Ʌͭ݉ݕّݱ݈聍Eٹձ̀��̀􁁅ѕёԹōِ͕(AűՑєىݥٍՐШ            EёŹݡ݉ũݹхШ0(            EёŹݙՉѥͅШШ            ɽɑՉIőŕ̨ Ш           ��          8(            񑕡Ё͑屔��            ͽѽȨMEٹձ̀��̀􁁅ѕёԹѕᑽم͍չЀ聁űՑєّաѵՑՐШ            ٽّMũԨȰ(            ٽّ]եݡШ܀Ш           ��ʹ𽑕ᐸ(           𽁉ՍͅɱԸ(          ĥ��        𽙥՜𨀀       𽉽ܸ(        񉕑ѽب        ѥѱԵ퍅QՉŹ܀􀝍Łѕɥٜظ؜(MхɐMŁѕɔݴ(        ݹAɕ͌��Łѕɕ��       ѥͅɱՐ��QՉŹ܁񰀅مѥٕU͉��       ѽőŹܵ퍅QՉŹݴ(        ܸ(       퍅QՉՕɉ݈؀(         񑕡Ё͑屔��ͽѽȨAűՑєّŹݕȰYݹэũԨȰuŉݥّ݀耘u��Łѕɕɉ݉��աи(        Ŵ(       𽍅ɐ𨨀      1ŉЁ͑屔��ՅɝŹ	ݑѽԨȁ��        񝅙ՙ݉ՙŕݕȨ        սє􉱽ݥ̈(        EѕёԵ큅ѕёմ(        ххMݕɍԵ퍅QՉՑőĀ􀝍ՉŅМ(ѕռݴ(        ܸ(        񑕡Ё͑屔��ͽѽȨAűՑєّաѵՑՐЁٽّMũԨȰuŉݥّ݀耠u��        mͅQՉՑőĨ          􁍅QՉՑőĹѕٝѠ,MŵqՌMŁѕɕиU͔AŹ͠Q܁齽԰QɅ܁ѼAŸ؜(          耝]řՙ݉ԁ͡ݝ́āѕռMŝمиYх͠QTqaձUȁ٥ɵ݅ɔEِMхɐDMŁѕɔY݈IՅЁхф؝��       𽑕ᐸ(       𽍅ɐ𨀀     𼸨     Ŵ((    졍ձՍѕѵݑԀ��ݍݐ܁񰁍ձՍѕѵݑԀ��ݩхܜĀؘ (      񍅉Ё͑屔��ՅɝŹ	ݑѽԨȁ��       񑕡Ё͑屔��ͽѽȨAűՑєّաаYݹѝեݡШ؀ЁՅɝŹ	ݑѽԨu��       m͕ѕ͑Ց5ݑԹѽUAՉōԠŴAɽ݉ŵՕȨ       𽑕ᐸ(       񑕡Ё͑屔��ͽѽȨAűՑєّաѵՑՐЁٽّMũԨȁ��       ّՈYх͡Ź܁ѡԁ퍕ѕ͑Ց5ݑմaձUȁ٥ɵ݅ɔЁѡԁAō܁ōьÉā퍕ѕ͑Ց5ݑԹѽUAՉōԠŴAɽ݉ŵՕȸ(       ݹٕ͐QTQŉݕЁōͽɑŹ܁ѼQTaݽ͕ݕőԁŉݙ԰QU؁ՍԁѡԁѥѽȁхȁѼMݵeєYŉ՝ŉԨ       ٽȁ录ȁхɝՐI݅ɐ؁QTUq݅Ёٍٕѥݸ]űЁɽՑԁѡɽ՝ѡԁ퍕ѕ͑Ց5ݑմAɽѽͽи(       𽑕ᐸ(       񑥙őՈ<𨀀      񑕡Ё͑屔��ͽѽȨAűՑєّաѵՑՐЁٽّMũԨȰuŉݥّ݀耐u��       MՁ}ɑՐQŉݕь聭͕ѕ͑Ց5ݑԀ��ݍݐ܀􀝅I4M݉ѕ൴=4,ݴ̽4н4܀I@ȀЀЁMQ4̈ЁىԈЁՑ̸Ĝ(٤iQՍŁŉєQՙōԝ��      𽑕ᐸ(      𽍅ɐ𨀀    Ŵ((    퍕ѕ͑Ց5ݑԀ��݅وե̀܀ؘ (      񍅉Ё͑屔��ՅɝŹ	ݑѽԨȁ��       񑕡Ё͑屔��ͽѽȨAűՑєّաаYݹѝեݡШ؀ЁՅɝŹ	ݑѽԨu��HeM@Aɽ݉ŵՕȰݑաи(       񑕡Ё͑屔��ͽѽȨAűՑєّաѵՑՐЁٽّMũԨȁ��       ّՈYх͡Ź܁ѡԁYHեM@aձUȁ٥ɵ݅ɔЁѡԁAō܁ōьÉŸEYHeM@Aɽ݉ŵՕȸ(       ݹٕ͐QTQŉݕЁYHMeōͽɑŹ܁ѼQTaݽ͕ݕő԰QU؁ՍԁѡԁѥѽȁхȁѼ(       ͽՁűԁŹЁՁѽŐYŉ՝ŉԁ٥āѡԁMQ,ԀXāIݑݍݰب       𽑕ᐸ(      𽍅ɐ𨀀    Ŵ(    𽙥՜𨀀  Ŵ(  𽍍ɽѱYŕܸ( Ĭ)��
+                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>Samples:</Text>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: 'rgba(150,150,150,0.3)',
+                        borderRadius: 8,
+                        padding: 6,
+                        color: palette.text,
+                        fontSize: 13,
+                      }}
+                      value={String(numSamples)}
+                      onChangeText={v => setNumSamples(parseInt(v) || 8192)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </Row>
+                <Row style={{ marginBottom: 8 }}>
+                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>Channels:</Text>
+                  <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginLeft: 8 }}>
+                    {[1, 2, 4, 8].map(c => (
+                      <Pressable
+                        key={c}
+                        onPress={() => setChannels(c)}
+                        style={{
+                          backgroundColor: channels === c ? palette.accent : pal
+ette.bgInset,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{
+                          color: channels === c ? palette.textOnAccent : palette.textMuted,
+                          fontSize: 12,
+                          fontWeight: '700',
+                        }}>{c}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </Row>
+                <Button
+                  title={capturing ? 'Capturing...' : 'Start Capture'}
+                  onPress={doCapture}
+                  disabled={capturing || !nativeUsb}
+                  loading={capturing}
+                />
+                {captureError && (
+                  <Text style={{ color: palette.danger, fontSize: 12, marginTop: 6 }}>{captureError}</Text>
+                )}
+              </Card>
+
+              <Card style={{ marginBottom: 12 }}>
+                <WaveformViewer
+                  mode="logic"
+                  palette={palette}
+                  dataSource={captureData ? 'serial' : 'demo'}
+                />
+                <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>
+                  {captureData
+                    ? captureData.length + ' samples captured. Use pinch to zoom, drag to pan.'
+                    : 'Waveform shows a demo signal. Flash the LA helper firmware and start a capture for real data.'}
+                </Text>
+              </Card>
+            </>
+          )}
+
+          {(selectedMode === 'swd' || selectedMode === 'jtag') && (
+            <Card style={{ marginBottom: 12 }}>
+              <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 6 }}>
+                {selectedMode.toUpperCase()} Programmer
+              </Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+           
+     After flashing the {selectedMode} helper firmware, the Pico acts as a {selectedMode.toUpperCase()} programmer.
+                Connect the target according to the hookup guide above, then use the Editor tab to compile firmware
+                for your target board. The upload function will route through the {selectedMode} protocol.
+              </Text>
+              <Divider />
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 4 }}>
+                Supported targets: {selectedMode === 'swd' ? 'ARM Cortex-M0/M0+/M3/M4/M7 (RP2040, STM32, nRF52, etc.)' : 'Any JTAG-capable device'}
+              </Text>
+            </Card>
+          )}
+
+          {selectedMode === 'avr-isp' && (
+            <Card style={{ marginBottom: 12 }}>
+              <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 6 }}>AVR ISP Programmer</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                After flashing the AVR-ISP helper firmware, the Pico acts as an AVR ISP programmer.
+                Connect the target AVR chip according to the hookup guide, then use the Editor tab to
+                compile and upload firmware via the STK500v1 protocol.
+              </Text>
+            </Card>
+          )}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
