@@ -51,7 +51,8 @@ object Uploaders {
             "esptool" -> espRom(usbManager, device, firmware, verify, onProgress)
             "dfu" -> UploadResult(false, "failed", false, "DFU backend not yet implemented (use arduino-cli upload path).")
             else -> UploadResult(false, "failed", false, "Unknown upload protocol: " + protocol)
-        }
+        
+}
     }
 
     // ---------------- STK500v1 (Uno, Mega) ----------------
@@ -96,7 +97,8 @@ object Uploaders {
             stkQuery(driver, byteArrayOf(STK_READ_SIGN, CRC_EOP), 3)
             onProgress("erasing", 0.0, "chip erase")
             stkExpect(driver, byteArrayOf(STK_CHIP_ERASE, CRC_EOP), byteArrayOf(INSYNC, OK))
-            var written = 0
+    
+        var written = 0
             for ((addr, page) in pages) {
                 onProgress("writing", written.toDouble() / pages.size, "page @0x" + addr.toString(16))
                 val loadAddr = byteArrayOf(STK_LOAD_ADDRESS, ((addr shr 1) and 0xff).toByte(), ((addr shr 9) and 0xff).toByte(), CRC_EOP)
@@ -134,7 +136,8 @@ object Uploaders {
 
     private fun stkExpect(driver: UsbSerialDriver, cmd: ByteArray, expect: ByteArray): Boolean {
         driver.write(cmd)
-        val got = stkRead(driver, expect.size + 32, 2000)
+       
+ val got = stkRead(driver, expect.size + 32, 2000)
         return contains(got, expect)
     }
 
@@ -185,7 +188,8 @@ object Uploaders {
         var driver: UsbSerialDriver? = null
         var enteredProgmode = false
         for (attempt in 1..10) {
-            onProgress("resetting", (attempt - 1) / 10.0, "1200-baud Caterina attempt " + attempt + "/10")
+            onProgress(
+"resetting", (attempt - 1) / 10.0, "1200-baud Caterina attempt " + attempt + "/10")
             val touch = UsbSerialDriver(usbManager, device) {}
             if (touch.open(1200, 8, 1, "none", false, false)) {
                 touch.write(byteArrayOf(0))
@@ -224,7 +228,8 @@ object Uploaders {
                 val cmd = ByteArrayOutputStream()
                 cmd.write('B'.code); cmd.write(0); cmd.write(page.size); cmd.write('F'.code); cmd.write(page)
                 driver.write(cmd.toByteArray())
-                Thread.sleep((page.size / 32 + 2).toLong())
+                Thread.sleep((
+page.size / 32 + 2).toLong())
                 done++
             }
             driver.write("L".toByteArray())
