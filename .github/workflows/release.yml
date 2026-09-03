@@ -26,16 +26,20 @@ jobs:
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -44,22 +48,26 @@ jobs:
             apps/mobile/android/.gradle
           key: gradle-release-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-release-${{ runner.os }}-
+
       - run: pnpm install --frozen-lockfile
+
       - name: SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+
       - name: Install SDK components
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-34' 'build-tools;34.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
+
       - name: Expo prebuild
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
+
       - name: Verify native USB module is autolinked
         working-directory: apps/mobile/android
         run: |
           echo "=== Verifying native USB module is autolinked ==="
           echo ""
           echo "settings.gradle autolinking section:"
-          grep -n "useExpoModules\|autolinking" settings.gradle || ec
-ho "No autolinking found"
+          grep -n "useExpoModules\|autolinking" settings.gradle || echo "No autolinking found"
           echo ""
           echo "Module directory check:"
           ls -la ../../packages/native-usb/android/build.gradle 2>/dev/null && echo "Module build.gradle exists" || echo "Module build.gradle NOT found"
@@ -70,6 +78,7 @@ ho "No autolinking found"
           echo ""
           echo "=== settings.gradle (last 10 lines) ==="
           tail -10 settings.gradle
+
       - name: Patch build config
         working-directory: apps/mobile/android
         run: |
@@ -99,18 +108,21 @@ ho "No autolinking found"
           fi
           echo "=== Final gradle.properties ==="
           cat gradle.properties
+
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set +e
           ./gradlew assembleDebug --no-daemon --parallel --build-cache 2>&1 | tee /tmp/build-output.log
           exit ${PIPESTATUS[0]}
+
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: droidvibe-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
       - name: Determine tag name
         id: tag
         run: |
@@ -121,6 +133,7 @@ ho "No autolinking found"
           else
             echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -131,6 +144,7 @@ ho "No autolinking found"
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Report build error
         if: failure()
         run: |
@@ -147,5 +161,4 @@ ho "No autolinking found"
             echo '~~~'
           } > /tmp/issue.md
           # DISABLED: auto-issue creation causes feedback loop
-          # gh issue create --title "Release build failed ($TAG)" --
-body-file /tmp/issue.md || true
+          # gh issue create --title "Release build failed ($TAG)" --body-file /tmp/issue.md || true

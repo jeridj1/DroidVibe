@@ -24,16 +24,21 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
+
       - name: Typecheck
         run: pnpm typecheck
+
       - name: Lint
         run: pnpm lint
 
@@ -43,28 +48,37 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
       - name: Install ARM GCC toolchain
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cmake
+
       - name: Clone Pico SDK
         run: git clone --depth 1 --recurse-submodules https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+
       - name: Build firmware projects
         env:
           PICO_SDK_PATH: /tmp/pico-sdk
         run: |
           set -e
           mkdir -p firmware-out
+
           for project in logic_analyzer swd jtag avr_isp; do
             echo "=== Building firmware/$project ==="
             mkdir -p "firmware/$project/build"
-            (cd "firmware/$project/build" && cmake .. -DPICO_SDK_PATH="$PICO_SDK_PATH" && make -j$(nproc) 2>&1)
+            (cd "firmware/$project/build" && \
+              cmake .. -DPICO_SDK_PATH="$PICO_SDK_PATH" && \
+              make -j$(nproc) 2>&1)
+
             for uf2_file in "firmware/$project/build"/*.uf2; do
               [ -f "$uf2_file" ] && cp "$uf2_file" firmware-out/
             done
           done
+
           echo "=== All firmware built ==="
           ls -la firmware-out/ || true
+
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -82,18 +96,132 @@ jobs:
       EXPO_NO_TELEMETRY: "1"
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
+
       - name: Generate PNG assets from SVG sources
         run: |
           npm install --prefix /tmp/asset-tools sharp
           NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
+
       - name: Expo prebuild
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
+
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [mobile-prebuild, build-firmware]
+    if: always() && needs.mobile-prebuild.result == 'success'
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            apps/mobile/android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}- 
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Download firmware artifacts
+        if: needs.build-firmware.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-uf2
+          path: firmware-out
+
+      - name: Copy firmware to Android assets
+        run: |
+          mkdir -p apps/mobile/src/main/assets/firmware
+          cp firmware-out/*.uf2 apps/mobile/src/main/assets/firmware/ 2>/dev/null || true
+          ls -la apps/mobile/src/main/assets/firmware/ || true
+
+      - name: Generate PNG assets from SVG sources
+        run: |
+          npm install --prefix /tmp/asset-tools sharp
+          NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
+
+      - name: Expo prebuild
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+
+      - name: Accept SDK licenses and install components
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-34' 'build-tools;34.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
+
+      - name: Patch build config
+        working-directory: apps/mobile/android
+        run: |
+          if [ -f gradle.properties ]; then
+            if ! grep -q 'android.kotlinVersion=' gradle.properties; then
+              echo "android.kotlinVersion=1.9.25" >> gradle.properties
+            fi
+
+            if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
+              echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
+            fi
+
+            if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
+              echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
+            fi
+
+            if ! grep -q 'org.gradle.parallel' gradle.properties; then
+              echo "org.gradle.parallel=true" >> gradle.properties
+            fi
+
+            if ! grep -q 'org.gradle.caching' gradle.properties; then
+              echo "org.gradle.caching=true" >> gradle.properties
+            fi
+          else
+            cat > gradle.properties << EOF
+android.kotlinVersion=1.9.25
+kotlin.jvm.target.validation.mode=warning
+org.gradle.jvmargs=-Xmx3g
+org.gradle.parallel=true
+org.gradle.caching=true
+EOF
+          fi
+
+      - name: Build debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-android-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
