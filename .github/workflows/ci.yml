@@ -28,6 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          check-lockfile: false
 
       - name: Download firmware artifacts
         if: needs.build-firmware.result == 'success'
@@ -69,6 +70,7 @@ jobs:
               echo '~~~'
             } > /tmp/tc-issue.md
             # gh issue create --title "
+
 CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
@@ -133,7 +135,8 @@ CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true 
             mkdir -p "firmware/$proj/build"
             (cd "firmware/$proj/build" && cmake .. -DPICO_SDK_PATH="$PICO_SDK_PATH" && make -j"$(nproc)" 2>&1)
             if [ -f "firmware/$proj/build/${exe}.uf2" ]; then
-              cp "firmware/$pro
+              cp "firmware/$pr
+o
 j/build/${exe}.uf2" "firmware-out/${out_name}.uf2"
               echo "Built: firmware-out/${out_name}.uf2 ($(wc -c < firmware-out/${out_name}.uf2) bytes)"
             else
@@ -194,7 +197,8 @@ test:
       - name: Expo prebuild
         working-directory: apps/mobile
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN 
+}}
 
         run: |
           set +e
@@ -248,7 +252,8 @@ d
             # Copy .uf2 to output with correct name
             if [ -f "firmware/$proj/build/${exe}.uf2" ]; then
               cp "firmware/$proj/build/${exe}.uf2" "firmware-out/${out_name}.uf2"
-              echo "Built: firm
+              echo "Built: f
+irm
 ware-out/${out_name}.uf2 ($(wc -c < firmware-out/${out_name}.uf2) bytes)"
             else
               echo "ERROR: ${exe}.uf2 not found in firmware/$proj/build/"
@@ -305,7 +310,8 @@ t/*.uf2
       - run: pnpm install --no-frozen-lockfile
       - name: Download firmware artifacts
         if: needs.build-firmware.result == 'success'
-        uses: act
+        uses:
+ act
 ions/download-artifact@v4
         with:
           name: firmware-uf2
@@ -349,7 +355,8 @@ s/node_modules node scripts/generate-assets.js
           if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
             echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
           fi
-          if ! grep -q 'org.gradle.jvmargs' gradle.properties
+          if ! grep -q 'org.gradle.jvmargs' gradle.prope
+rties
 ; then
             echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
           fi
@@ -391,7 +398,8 @@ fig
           # Install react-native CLI (not included by default in Expo projects)
           pnpm add -D @react-native-community/cli@latest 2>&1 | tee /tmp/bundle-output.txt
           
-          # Create a temporary entry file inside apps/mobile/ (under Metro's p
+          # Create a temporary entry file inside apps/mobile/ (under Met
+ro's p
 rojectRoot)
           # so Metro can watch it and compute its SHA-1.
           echo "import 'expo-router/entry';" > index.js
@@ -443,7 +451,8 @@ ts-dest android/app/src/main/res/ \
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          {
+      
+    {
  
            echo "## Android APK Build Failure"
             echo ""
