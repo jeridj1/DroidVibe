@@ -34,6 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          check-lockfile: false
 
       - uses: actions/setup-java@v4
         with:
@@ -67,7 +68,8 @@ jobs:
           echo "=== Verifying native USB module is autolinked ==="
           echo ""
           echo "settings.gradle autolinking section:"
-          grep -n "useExpoModules\|autolinking" settings.gradle || echo "No autolinking found"
+          grep -n "useExpoModules\|autolinking" settin
+gs.gradle || echo "No autolinking found"
           echo ""
           echo "Module directory check:"
           ls -la ../../packages/native-usb/android/build.gradle 2>/dev/null && echo "Module build.gradle exists" || echo "Module build.gradle NOT found"
@@ -109,7 +111,8 @@ jobs:
           echo "=== Final gradle.properties ==="
           cat gradle.properties
 
-      - name: Build debug APK
+  
+    - name: Build debug APK
         working-directory: apps/mobile/android
         run: |
           set +e
@@ -162,4 +165,5 @@ jobs:
             tail -200 /tmp/build-output.log 2>/dev/null || echo "No build output captured"
             echo '~~~'
           } > /tmp/issue.md
-          # gh issue create --title "Release build failed ($TAG)" --body-file /tmp/issue.md || true  # DISABLED: auto-issue creation causes feedback loop
+          # gh issue create --title "Release buil
+d failed ($TAG)" --body-file /tmp/issue.md || true  # DISABLED: auto-issue creation causes feedback loop

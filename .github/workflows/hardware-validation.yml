@@ -25,6 +25,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          check-lockfile: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -52,7 +53,8 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" | grep -E 'assets/index.android.bundle|assets/.*/index.android.bundle|assets/.+\.bundle' >/tmp/bundle-assets.txt
           cat /tmp/bundle-assets.txt
-      - name: Upload APK
+  
+    - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: droidvibe-hardware-validation-apk
