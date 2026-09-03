@@ -144,7 +144,8 @@ jobs:
             exit 1
           fi
 
-  build-firmware:
+  build
+-firmware:
     name: Build RP2040 Firmware
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -374,4 +375,5 @@ ts-dest android/app/src/main/res/ \
             tail -100 /tmp/build-output.txt 2>/dev/null || echo "No build output captured"
             echo '~~~'
           } > /tmp/apk-issue.md
-          gh issue create --title "CI: Android APK build failure (${{ github.sha }})" --body-file /tmp/apk-issue.md || true
+          gh issue create --title "CI: Android APK build failure (${{ github.sha }})" 
+--body-file /tmp/apk-issue.md || true
