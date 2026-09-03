@@ -1,0 +1,90 @@
+name: DroidVibe Hardware Validation APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build and Validate APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            apps/mobile/android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}- 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Android SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-34' 'build-tools;34.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
+      - name: Generate standalone Android project
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+      - name: Verify native USB autolinking
+        working-directory: apps/mobile/android
+        run: |
+          echo "=== Verifying native USB module autolinking ==="
+          test -f ../../packages/native-usb/android/build.gradle && echo "✅ Native USB module exists" || echo "❌ Native USB module missing"
+          grep -R "droidvibe" settings.gradle app/build.gradle || echo "No droidvibe references found"
+      - name: Build standalone debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace
+      - name: Verify APK contains bundled React Native assets
+        run: |
+          APK=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK" && echo "✅ APK exists and is non-empty" || echo "❌ APK missing or empty"
+          if [ -f "$APK" ]; then
+            unzip -l "$APK" | grep -E 'assets/index\.android\.bundle|assets/.*/index\.android\.bundle' > /tmp/bundle-assets.txt
+            if [ -s /tmp/bundle-assets.txt ]; then
+              echo "✅ JavaScript bundle found in APK"
+              cat /tmp/bundle-assets.txt
+            else
+              echo "❌ JavaScript bundle NOT found in APK"
+            fi
+          fi
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-hardware-validation-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Report build status
+        if: always()
+        run: |
+          echo "## Build Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Workflow: Hardware Validation APK" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
