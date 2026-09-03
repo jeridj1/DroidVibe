@@ -73,10 +73,10 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
-      - uses: actions
-/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
+
 
 
       - run: pnpm install --no-frozen-lockfile
@@ -141,12 +141,12 @@ jobs:
               cat /tmp/prebuild-output.txt
               echo '~~~'
             } > /tmp/pb-issue.md
-            # gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/p
-b-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
+            # gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/pb-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
 
-  build
+  buil
+d
 -firmware:
     name: Build RP2040 Firmware
     runs-on: ubuntu-latest
@@ -190,12 +190,12 @@ b-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
           build_firmware avr_isp droidvibe_avr_isp avr_isp_helper
           echo "=== All firmware built ==="
           ls -la firmware-out/
-      - name: Upload firmware artifac
-ts
+      - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
           name: firmware-uf2
-          path: firmware-ou
+          path: firmware-
+ou
 t/*.uf2
           if-no-files-found: error
           retention-days: 30
@@ -246,11 +246,11 @@ t/*.uf2
           else
             echo "WARNING: No firmware artifacts available — Prepare Pico will show asset-not-found at runtime"
           fi
-      - name: Generate PNG assets from S
-VG sources
+      - name: Generate PNG assets from SVG sources
         run: |
           npm install --prefix /tmp/asset-tools sharp
-          NODE_PATH=/tmp/asset-tool
+          NODE_PATH=/tmp/asset-t
+ool
 s/node_modules node scripts/generate-assets.js
       - name: Expo prebuild
         working-directory: apps/mobile
@@ -288,9 +288,9 @@ s/node_modules node scripts/generate-assets.js
           fi
           if [ -f app/build.gradle ]; then
             if ! grep -q 'buildConfig = true' app/build.gradle; then
-            
-  if grep -q 'buildConfig = false' app/build.gradle; then
-                sed -i 's/buildConfig = false/buildConfig 
+              if grep -q 'buildConfig = false' app/build.gradle; then
+                sed -i 's/buildConfig = false/buildCon
+fig 
 = true/g' app/build.gradle
               elif grep -q 'buildFeatures {' app/build.gradle; then
                 sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
@@ -328,10 +328,10 @@ s/node_modules node scripts/generate-assets.js
           pnpm exec react-native bundle \
             --platform android \
             --dev false \
-            --entry-f
-ile "$ENTRY_FILE" \
+            --entry-file "$ENTRY_FILE" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
-            --asse
+            -
+-asse
 ts-dest android/app/src/main/res/ \
             --max-workers 2 \
             --verbose 2>&1 | tee -a /tmp/bundle-output.txt
@@ -380,7 +380,7 @@ ts-dest android/app/src/main/res/ \
             echo '~~~'
             tail -100 /tmp/build-output.txt 2>/dev/null || echo "No build output captured"
             echo '~~~'
-
           } > /tmp/apk-issue.md
-          gh issue create --title "CI: Android APK build failure (${{ github.sha }})" 
+          gh issue create --title "CI: Android APK build failure (${{ github.sha
+ }})" 
 --body-file /tmp/apk-issue.md || true
