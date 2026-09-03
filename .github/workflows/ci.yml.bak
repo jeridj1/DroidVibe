@@ -1,20 +1,16 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
-
 concurrency:
   group: ci-main
   cancel-in-progress: true
-
 permissions:
   contents: read
   issues: write
-
 jobs:
   quality:
     name: Typecheck and Lint
@@ -51,7 +47,7 @@ jobs:
               cat /tmp/tsc-output.txt
               echo '~~~'
             } > /tmp/tc-issue.md
-            gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
+            # gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
       - name: Upload typecheck output
@@ -62,7 +58,6 @@ jobs:
           path: /tmp/tsc-output.txt
           if-no-files-found: ignore
       - run: pnpm lint
-
   web-build:
     name: Build Web Backend
     runs-on: ubuntu-latest
@@ -83,7 +78,6 @@ jobs:
         with:
           name: web-dist
           path: packages/web/dist
-
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -99,7 +93,6 @@ jobs:
           node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
-
   mobile-prebuild:
     name: Expo Prebuild Validation
     runs-on: ubuntu-latest
@@ -139,10 +132,9 @@ jobs:
               cat /tmp/prebuild-output.txt
               echo '~~~'
             } > /tmp/pb-issue.md
-            gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/pb-issue.md || true
+            # gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/pb-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
-
   build-firmware:
     name: Build RP2040 Firmware
     runs-on: ubuntu-latest
@@ -193,7 +185,6 @@ jobs:
           path: firmware-out/*.uf2
           if-no-files-found: error
           retention-days: 30
-
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
@@ -281,7 +272,8 @@ jobs:
           if [ -f app/build.gradle ]; then
             if ! grep -q 'buildConfig = true' app/build.gradle; then
               if grep -q 'buildConfig = false' app/build.gradle; then
-                sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
+                sed -i 's/buildConfig = false/buildConfig 
+= true/g' app/build.gradle
               elif grep -q 'buildFeatures {' app/build.gradle; then
                 sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
               elif grep -q 'android {' app/build.gradle; then

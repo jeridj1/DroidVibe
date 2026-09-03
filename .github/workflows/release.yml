@@ -162,4 +162,4 @@ jobs:
             tail -200 /tmp/build-output.log 2>/dev/null || echo "No build output captured"
             echo '~~~'
           } > /tmp/issue.md
-          gh issue create --title "Release build failed ($TAG)" --body-file /tmp/issue.md || true
+          # gh issue create --title "Release build failed ($TAG)" --body-file /tmp/issue.md || true  # DISABLED: auto-issue creation causes feedback loop
