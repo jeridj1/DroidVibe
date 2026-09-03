@@ -5,7 +5,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start --dev-client",
-    "build": "echo use prebuild/eas build",
+    "build": "eas build --platform android",
     "prebuild": "expo prebuild --platform android --clean",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
