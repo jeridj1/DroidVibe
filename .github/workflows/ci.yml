@@ -28,6 +28,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Download firmware artifacts
+        if: needs.build-firmware.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-uf2
+          path: firmware-out
+      - name: Copy firmware to Android assets
+        run: |
+          mkdir -p apps/mobile/src/main/assets/firmware
+          if [ -d firmware-out ]; then
+            cp firmware-out/*.uf2 apps/mobile/src/main/assets/firmware/ 2>/dev/null || true
+            echo "Firmware assets copied:"
+            ls -la apps/mobile/src/main/assets/firmware/ || true
+          else
+            echo "WARNING: No firmware artifacts available"
+          fi
       - run: pnpm install --no-frozen-lockfile
       - name: Typecheck
         env:
@@ -73,7 +90,8 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
-      - uses: actions/setup-node@v4
+      - uses: actions
+/setup-node@v4
         with:
           node-version: 22
 
@@ -86,7 +104,56 @@ jobs:
           name: web-dist
           path: packages/web/dist
 
-  test:
+  
+  build-firmware:
+    name: Build RP2040 Firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM GCC toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cmake
+      - name: Clone Pico SDK
+        run: |
+          git clone --depth 1 --recurse-submodules https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+      - name: Build firmware projects
+        env:
+          PICO_SDK_PATH: /tmp/pico-sdk
+        run: |
+          set -e
+          mkdir -p firmware-out
+          build_firmware() {
+            local proj="$1"
+            local exe="$2"
+            local out_name="$3"
+            echo "=== Building $proj ($exe) ==="
+            mkdir -p "firmware/$proj/build"
+            (cd "firmware/$proj/build" && cmake .. -DPICO_SDK_PATH="$PICO_SDK_PATH" && make -j"$(nproc)" 2>&1)
+            if [ -f "firmware/$proj/build/${exe}.uf2" ]; then
+              cp "firmware/$proj/build/${exe}.uf2" "firmware-out/${out_name}.uf2"
+              echo "Built: firmware-out/${out_name}.uf2 ($(wc -c < firmware-out/${out_name}.uf2) bytes)"
+            else
+              echo "ERROR: ${exe}.uf2 not found in firmware/$proj/build/"
+              ls -la "firmware/$proj/build/" || true
+              return 1
+            fi
+          }
+          build_firmware logic_analyzer droidvibe_la logic_analyzer_helper
+          build_firmware swd droidvibe_swd swd_helper
+          build_firmware jtag droidvibe_jtag jtag_helper
+          build_firmware avr_isp droidvibe_avr_isp avr_isp_helper
+          echo "=== All firmware built ==="
+          ls -la firmware-out/
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-uf2
+          path: firmware-out/*.uf2
+          if-no-files-found: error
+          retention-days: 30
+test:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -141,7 +208,8 @@ jobs:
               cat /tmp/prebuild-output.txt
               echo '~~~'
             } > /tmp/pb-issue.md
-            # gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/pb-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
+            # gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/
+pb-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
 
@@ -190,7 +258,8 @@ d
           build_firmware avr_isp droidvibe_avr_isp avr_isp_helper
           echo "=== All firmware built ==="
           ls -la firmware-out/
-      - name: Upload firmware artifacts
+      - name: Upload firmware artif
+acts
         uses: actions/upload-artifact@v4
         with:
           name: firmware-uf2
@@ -246,7 +315,8 @@ t/*.uf2
           else
             echo "WARNING: No firmware artifacts available — Prepare Pico will show asset-not-found at runtime"
           fi
-      - name: Generate PNG assets from SVG sources
+      - name: Generate PNG assets fro
+m SVG sources
         run: |
           npm install --prefix /tmp/asset-tools sharp
           NODE_PATH=/tmp/asset-t
@@ -288,7 +358,8 @@ s/node_modules node scripts/generate-assets.js
           fi
           if [ -f app/build.gradle ]; then
             if ! grep -q 'buildConfig = true' app/build.gradle; then
-              if grep -q 'buildConfig = false' app/build.gradle; then
+        
+      if grep -q 'buildConfig = false' app/build.gradle; then
                 sed -i 's/buildConfig = false/buildCon
 fig 
 = true/g' app/build.gradle
@@ -328,7 +399,8 @@ fig
           pnpm exec react-native bundle \
             --platform android \
             --dev false \
-            --entry-file "$ENTRY_FILE" \
+            --en
+try-file "$ENTRY_FILE" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             -
 -asse
@@ -379,7 +451,8 @@ ts-dest android/app/src/main/res/ \
             echo "### Build Output (last 100 lines)"
             echo '~~~'
             tail -100 /tmp/build-output.txt 2>/dev/null || echo "No build output captured"
-            echo '~~~'
+            echo 
+'~~~'
           } > /tmp/apk-issue.md
           gh issue create --title "CI: Android APK build failure (${{ github.sha
  }})" 
