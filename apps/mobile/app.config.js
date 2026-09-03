@@ -34,14 +34,14 @@ try {
     });
   } catch (e2) {
     console.warn('[DroidVibe] Failed to load config plugins from @expo/config-plugins:', e2.message);
-    console.warn('[DroidVibe] Config plugins will NOT run \u2014 CI fallback patch will handle buildConfig');
+    console.warn('[DroidVibe] Config plugins will NOT run — CI fallback patch will handle buildConfig');
   }
 }
 
 /**
  * Safely get the gradle.properties as an array of {key, value} objects.
- * Different versions of @expo/config-plugins may provide modResults in
- * different formats (PropertiesConfig object, raw string, or Map).
+ * Different versions of @expo/config-plugins may provide modResults
+ * in different formats (PropertiesConfig object, raw string, or Map).
  */
 function getGradleProps(modResults) {
   // Case 1: PropertiesConfig with .properties array
@@ -66,13 +66,13 @@ function getGradleProps(modResults) {
 
 function withKotlinVersion(config) {
   if (!withGradleProperties) {
-    console.warn('[DroidVibe] withGradleProperties not available \u2014 skipping Kotlin version patch');
+    console.warn('[DroidVibe] withGradleProperties not available — skipping Kotlin version patch');
     return config;
   }
   return withGradleProperties(config, (cfg) => {
     const modResults = getGradleProps(cfg.modResults);
     if (!modResults) {
-      console.warn('[DroidVibe] Could not get gradle.properties \u2014 skipping Kotlin version patch');
+      console.warn('[DroidVibe] Could not get gradle.properties — skipping Kotlin version patch');
       return cfg;
     }
     const props = modResults.properties;
@@ -113,7 +113,7 @@ function withKotlinVersion(config) {
       props.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
     }
 
-    console.log('[DroidVibe] withKotlinVersion plugin applied \u2014 gradle.properties patched');
+    console.log('[DroidVibe] withKotlinVersion plugin applied — gradle.properties patched');
     return cfg;
   });
 }
@@ -129,7 +129,7 @@ function withKotlinVersion(config) {
  */
 function withBuildConfigEnabled(config) {
   if (!withAppBuildGradle) {
-    console.warn('[DroidVibe] withAppBuildGradle not available \u2014 skipping BuildConfig + namespace patch');
+    console.warn('[DroidVibe] withAppBuildGradle not available — skipping BuildConfig + namespace patch');
     return config;
   }
   return withAppBuildGradle(config, (cfg) => {
