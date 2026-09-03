@@ -149,8 +149,8 @@ class DroidVibeToolchainModule : Module() {
         configDir.mkdirs(); dataDir.mkdirs(); userDir.mkdirs()
         return try {
             val command = ArrayList<String>(args.size + 1)
-            command += executable.absolutePath
-            command += args
+            command.add(executable.absolutePath)
+            command.addAll(args.toList())
             val process = ProcessBuilder(command)
                 .directory(configDir)
                 .redirectErrorStream(true)
