@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'playground/**'
     paths-ignore:
       - '**.md'
       - '.github/**'
@@ -19,7 +21,7 @@ permissions:
 
 jobs:
   quality:
-    name: Typecheck and Lint
+    name: Typecheck, Lint and Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,13 +36,16 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
 
   build-firmware:
     name: Build RP2040 Firmware
@@ -106,7 +111,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Generate PNG assets from SVG sources
         run: |
@@ -120,7 +125,7 @@ jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     needs: [mobile-prebuild, build-firmware]
     if: always() && needs.mobile-prebuild.result == 'success'
     env:
@@ -143,6 +148,22 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.1'
+
+      - name: Build Android ARM64 Arduino CLI
+        run: |
+          set -e
+          git clone --depth 1 https://github.com/ipodvideo87/arduino-cli-android.git /tmp/arduino-cli-android
+          mkdir -p packages/native-usb/android/src/main/jniLibs/arm64-v8a
+          cd /tmp/arduino-cli-android
+          CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -buildvcs=false \
+            -o "$GITHUB_WORKSPACE/packages/native-usb/android/src/main/jniLibs/arm64-v8a/libarduino-cli.so" .
+          chmod 755 "$GITHUB_WORKSPACE/packages/native-usb/android/src/main/jniLibs/arm64-v8a/libarduino-cli.so"
+          test -s "$GITHUB_WORKSPACE/packages/native-usb/android/src/main/jniLibs/arm64-v8a/libarduino-cli.so"
+          file "$GITHUB_WORKSPACE/packages/native-usb/android/src/main/jniLibs/arm64-v8a/libarduino-cli.so"
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -150,9 +171,9 @@ jobs:
             ~/.gradle/wrapper
             apps/mobile/android/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}- 
+          restore-keys: gradle-${{ runner.os }}-
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Download firmware artifacts
         if: needs.build-firmware.result == 'success'
