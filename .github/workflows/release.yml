@@ -1,1 +1,169 @@
-successfully downloaded text file (SHA: 03cc855ff33af77a243817792654411f82d6460d)
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  release-apk:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          check-lockfile: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            apps/mobile/android/.gradle
+          key: gradle-release-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-release-${{ runner.os }}-
+
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: SDK licenses
+        run: yes |${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Install SDK components
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
+
+      - name: Expo prebuild
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+
+      - name: Verify native USB module is autolinked
+        working-directory: apps/mobile/android
+        run: |
+          echo "=== Verifying native USB module is autolinked ==="
+          echo ""
+          echo "settings.gradle autolinking section:"
+          grep -n "useExpoModules\|autolinking" settin
+gs.gradle || echo "No autolinking found"
+          echo ""
+          echo "Module directory check:"
+          ls -la ../../packages/native-usb/android/build.gradle 2>/dev/null && echo "Module build.gradle exists" || echo "Module build.gradle NOT found"
+          echo ""
+          echo "NOTE: The nativeModulesDir config in package.json tells Expo autolinking"
+          echo "to search packages/ for local modules. useExpoModules() in settings.gradle"
+          echo "handles the actual module linking dynamically - no manual injection needed."
+          echo ""
+          echo "=== settings.gradle (last 10 lines) ==="
+          tail -10 settings.gradle
+
+      - name: Patch build config
+        working-directory: apps/mobile/android
+        run: |
+          if [ -f gradle.properties ]; then
+            if grep -q 'android.kotlinVersion=' gradle.properties; then
+              sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties
+            else
+              echo "android.kotlinVersion=1.9.25" >> gradle.properties
+            fi
+          else
+            echo "android.kotlinVersion=1.9.25" > gradle.properties
+          fi
+          if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
+            echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
+          fi
+          if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
+            echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
+          fi
+          if ! grep -q 'org.gradle.parallel' gradle.properties; then
+            echo "org.gradle.parallel=true" >> gradle.properties
+          fi
+          if ! grep -q 'org.gradle.caching' gradle.properties; then
+            echo "org.gradle.caching=true" >> gradle.properties
+          fi
+          if [ -f build.gradle ]; then
+            sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
+          fi
+          echo "=== Final gradle.properties ==="
+          cat gradle.properties
+
+  
+    - name: Build debug APK
+        working-directory: apps/mobile/android
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon --parallel --build-cache 2>&1 | tee /tmp/build-output.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "name=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.ref_name }}" ]; then
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: DroidVibe ${{ steps.tag.outputs.name }}
+          generate_release_notes: true
+          files: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report build error
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.name || github.ref_name }}"
+          {
+            echo "## Release build failed"
+            echo ""
+            echo "Tag: $TAG"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "### Build Output (last 200 lines)"
+            echo '~~~'
+            tail -200 /tmp/build-output.log 2>/dev/null || echo "No build output captured"
+            echo '~~~'
+          } > /tmp/issue.md
+          # gh issue create --title "Release buil
+d failed ($TAG)" --body-file /tmp/issue.md || true  # DISABLED: auto-issue creation causes feedback loop
