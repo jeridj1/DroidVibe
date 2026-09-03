@@ -51,7 +51,7 @@ jobs:
               cat /tmp/tsc-output.txt
               echo '~~~'
             } > /tmp/tc-issue.md
-            gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
+            # gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
       - name: Upload typecheck output
@@ -73,7 +73,8 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
-      - uses: actions/setup-node@v4
+      - uses: actions
+/setup-node@v4
         with:
           node-version: 22
 
@@ -140,7 +141,8 @@ jobs:
               cat /tmp/prebuild-output.txt
               echo '~~~'
             } > /tmp/pb-issue.md
-            gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/pb-issue.md || true
+            # gh issue create --title "CI: Expo prebuild failure (${{ github.sha }})" --body-file /tmp/p
+b-issue.md || true  # DISABLED: auto-issue creation causes feedback loop
             exit 1
           fi
 
@@ -188,7 +190,8 @@ jobs:
           build_firmware avr_isp droidvibe_avr_isp avr_isp_helper
           echo "=== All firmware built ==="
           ls -la firmware-out/
-      - name: Upload firmware artifacts
+      - name: Upload firmware artifac
+ts
         uses: actions/upload-artifact@v4
         with:
           name: firmware-uf2
@@ -243,7 +246,8 @@ t/*.uf2
           else
             echo "WARNING: No firmware artifacts available — Prepare Pico will show asset-not-found at runtime"
           fi
-      - name: Generate PNG assets from SVG sources
+      - name: Generate PNG assets from S
+VG sources
         run: |
           npm install --prefix /tmp/asset-tools sharp
           NODE_PATH=/tmp/asset-tool
@@ -284,7 +288,8 @@ s/node_modules node scripts/generate-assets.js
           fi
           if [ -f app/build.gradle ]; then
             if ! grep -q 'buildConfig = true' app/build.gradle; then
-              if grep -q 'buildConfig = false' app/build.gradle; then
+            
+  if grep -q 'buildConfig = false' app/build.gradle; then
                 sed -i 's/buildConfig = false/buildConfig 
 = true/g' app/build.gradle
               elif grep -q 'buildFeatures {' app/build.gradle; then
@@ -323,7 +328,8 @@ s/node_modules node scripts/generate-assets.js
           pnpm exec react-native bundle \
             --platform android \
             --dev false \
-            --entry-file "$ENTRY_FILE" \
+            --entry-f
+ile "$ENTRY_FILE" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --asse
 ts-dest android/app/src/main/res/ \
@@ -374,6 +380,7 @@ ts-dest android/app/src/main/res/ \
             echo '~~~'
             tail -100 /tmp/build-output.txt 2>/dev/null || echo "No build output captured"
             echo '~~~'
+
           } > /tmp/apk-issue.md
           gh issue create --title "CI: Android APK build failure (${{ github.sha }})" 
 --body-file /tmp/apk-issue.md || true
