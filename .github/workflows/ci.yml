@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'playground/**'
     paths-ignore:
       - '**.md'
       - '.github/**'
@@ -19,7 +21,7 @@ permissions:
 
 jobs:
   quality:
-    name: Typecheck and Lint
+    name: Typecheck, Lint and Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,13 +36,16 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
 
   build-firmware:
     name: Build RP2040 Firmware
@@ -106,7 +111,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Generate PNG assets from SVG sources
         run: |
@@ -150,9 +155,9 @@ jobs:
             ~/.gradle/wrapper
             apps/mobile/android/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}- 
+          restore-keys: gradle-${{ runner.os }}-
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Download firmware artifacts
         if: needs.build-firmware.result == 'success'
