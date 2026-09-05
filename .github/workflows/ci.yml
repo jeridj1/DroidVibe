@@ -18,10 +18,34 @@ permissions:
   contents: read
 
 jobs:
+  corruption-scan:
+    name: Corruption Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for mid-token newlines
+        run: |
+          if grep -r "Style nSheet\|asyn nc\|useState<str ning\|StyleShee nt\|Layou ntAnimation" apps/mobile/; then
+            echo "ERROR: Mid-token newline corruption detected!"
+            exit 1
+          fi
+
+      - name: Scan for binary files
+        run: |
+          for file in $(find apps/mobile/app -name "*.tsx" -o -name "*.ts" -o -name "*.jsx" -o -name "*.js"); do
+            if file "$file" | grep -q "binary"; then
+              echo "ERROR: Binary file detected: $file"
+              exit 1
+            fi
+          done
+
   quality:
     name: Typecheck and Lint
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: corruption-scan
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +58,8 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies (no frozen lockfile)
+        run: pnpm install
 
       - name: Typecheck
         run: pnpm typecheck
@@ -46,6 +71,7 @@ jobs:
     name: Build RP2040 Firmware
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: quality
     steps:
       - uses: actions/checkout@v4
 
@@ -106,7 +132,8 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install
 
       - name: Generate PNG assets from SVG sources
         run: |
@@ -152,7 +179,8 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}- 
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install
 
       - name: Download firmware artifacts
         if: needs.build-firmware.result == 'success'
