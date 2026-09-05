@@ -141,7 +141,7 @@ export default function EditorScreen() {
     buildStageRef.current = buildStage;
   }, [buildStage]);
 
-  // Track code changes for undo history (debounced Ã¢ÂÂ only snapshots meaningful edits)
+  // Track code changes for undo history (debounced — only snapshots meaningful edits)
   useEffect(() => {
     if (code === lastCodeRef.current) return;
     const timer = setTimeout(() => {
@@ -209,7 +209,7 @@ export default function EditorScreen() {
     });
   }, []);
 
-  // USB disconnect detection Ã¢ÂÂ abort in-progress upload
+  // USB disconnect detection — abort in-progress upload
   useEffect(() => {
     if (!nativeUsb) return;
     const unsub = addDeviceListener((e) => {
@@ -290,7 +290,7 @@ export default function EditorScreen() {
     }
     if (!fw) return;
 
-    // Open device picker Ã¢ÂÂ filter to only permission-granted devices
+    // Open device picker — filter to only permission-granted devices
     const devs = await listDevices();
     const granted = devs.filter((d) => d.permission === 'granted');
     setDevices(granted);
@@ -342,7 +342,7 @@ export default function EditorScreen() {
     uploadDeviceRef.current = device;
     uploadAbortedRef.current = false;
 
-    // Board identification Ã¢ÂÂ explicit confirmed state
+    // Board identification — explicit confirmed state
     const id = identifyBoard(device.vendorId, device.productId);
     setIdentifiedBoard(id);
 
@@ -516,12 +516,12 @@ export default function EditorScreen() {
       {!nativeUsb && (
         <View style={[styles.banner, { backgroundColor: palette.warning + '18', borderColor: palette.warning }]}>
           <Text style={{ color: palette.warning, fontSize: 12, fontWeight: '600' }}>
-            Expo Go detected Ã¢ÂÂ native USB unavailable. Build a dev/production APK for hardware access.
+            Expo Go detected — native USB unavailable. Build a dev/production APK for hardware access.
           </Text>
         </View>
       )}
 
-      {/* Identified board state Ã¢ÂÂ explicit confirmed state */}
+      {/* Identified board state — explicit confirmed state */}
       {identifiedBoard && (
         <View style={[styles.boardIdBar, { backgroundColor: palette.accent + '12', borderColor: palette.accent + '40' }]}>
           <HardwareStatusBadge state="connected" />
@@ -530,7 +530,7 @@ export default function EditorScreen() {
               Board identified: {identifiedBoard.name}
             </Text>
             <Text style={{ color: palette.textMuted, fontSize: 11 }}>
-              {identifiedBoard.protocol} Ã¢ÂÂ {identifiedBoard.fqbn}
+              {identifiedBoard.protocol} — {identifiedBoard.fqbn}
             </Text>
           </View>
         </View>
@@ -650,14 +650,15 @@ export default function EditorScreen() {
                 }}
               />
               <Row style={{ marginTop: 6 }}>
-                <Button                  title={aiLoading ? 'Generating...' : 'Generate'}
+                <Button
+                  title={aiLoading ? 'Generating...' : 'Generate'}
                   onPress={doGenerate}
-      
-            disabled={aiLoading}
+                  disabled={aiLoading}
                   loading={aiLoading}
                 />
               </Row>
-            </Card>          )}
+            </Card>
+          )}
           {aiResult !== null && (
             <Card style={{ marginBottom: 6, padding: 10, borderLeftWidth: 3, borderLeftColor: palette.success }}>
               <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
@@ -678,11 +679,13 @@ export default function EditorScreen() {
                 {aiResult.split('\n').slice(0, 20).join('\n')}
                 {aiResult.split('\n').length > 20 ? '\n...' : ''}
               </Text>
-            </Card>          )}
+            </Card>
+          )}
           {diagnostics.length === 0 && !compiling && !ai && !uploadMsg && !error && (
             <Text style={{ color: palette.textMuted, fontSize: 12 }}>
               No diagnostics. Tap Compile to build, Upload to flash firmware.
-            </Text>          )}
+            </Text>
+          )}
         </ScrollView>
       </View>
 
@@ -692,15 +695,16 @@ export default function EditorScreen() {
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
             <Row style={{ justifyContent: 'space-between', marginBottom: 12 }}>
               <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Select device</Text>
-              
-<Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
+              <Button title="Cancel" onPress={() => setShowDevicePicker(false)} variant="ghost" />
             </Row>
-            <FlatList              data={devices}
+            <FlatList
+              data={devices}
               keyExtractor={(d) => d.id}
               renderItem={({ item }) => {
                 const id = identifyBoard(item.vendorId, item.productId);
                 return (
-                  <Pressable                    onPress={() => doUploadToDevice(item)}
+                  <Pressable
+                    onPress={() => doUploadToDevice(item)}
                     style={[styles.deviceItem, { borderColor: palette.surfaceBorder }]}
                   >
                     <Row style={{ justifyContent: 'space-between' }}>
@@ -708,20 +712,26 @@ export default function EditorScreen() {
                         <Text style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>
                           {id?.name ?? item.productName ?? 'Unknown device'}
                         </Text>
-                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>                          {item.manufacturer ?? 'â'} Â· VID {item.vendorId} PID {item.productId}
+                        <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
+                          {item.manufacturer ?? '—'} · VID {item.vendorId} PID {item.productId}
                         </Text>
-                      </View>                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
-                    </Row>                    {id && (
+                      </View>
+                      {item.bootsel && <Badge label="BOOTSEL" tone="accent" />}
+                    </Row>
+                    {id && (
                       <Row style={{ marginTop: 6 }} gap={8}>
                         <Badge label={id.protocol} tone="accent" />
                         <Text style={{ color: palette.textMuted, fontSize: 11 }}>{id.fqbn}</Text>
-                      </Row>                    )}
-                  </Pressable>                );
+                      </Row>
+                    )}
+                  </Pressable>
+                );
               }}
               ListEmptyComponent={
                 <Text style={{ color: palette.textMuted, textAlign: 'center', padding: 20 }}>
                   No devices found. Connect a board and tap Rescan on the Devices tab.
-                </Text>              }
+                </Text>
+              }
             />
           </View>
         </View>
@@ -732,16 +742,18 @@ export default function EditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
             <Row justify="space-between" style={{ marginBottom: 12 }}>
-              <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Find &amp; Replace</Text>
+              <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>Find & Replace</Text>
               <Button title="Close" onPress={() => setShowFind(false)} variant="ghost" size="sm" />
             </Row>
-            <TextInput              value={findText}
+            <TextInput
+              value={findText}
               onChangeText={setFindText}
               placeholder="Find..."
               placeholderTextColor={palette.textMuted}
               style={[styles.findInput, { color: palette.text, borderColor: palette.surfaceBorder, backgroundColor: palette.surface }]}
             />
-            <TextInput              value={replaceText}
+            <TextInput
+              value={replaceText}
               onChangeText={setReplaceText}
               placeholder="Replace with..."
               placeholderTextColor={palette.textMuted}
@@ -750,13 +762,17 @@ export default function EditorScreen() {
             <Row gap={8} style={{ marginTop: 12, flexWrap: 'wrap' }}>
               <Button title="Replace" onPress={doReplace} disabled={findCount === 0} variant="ghost" size="sm" />
               <Button title="Replace All" onPress={doReplaceAll} disabled={!findText} variant="ghost" size="sm" />
-            </Row>            {findText && (
-              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>                {findCount > 0 ? findCount + ' match' + (findCount !== 1 ? 'es' : '') + ' found' : 'No matches found'}
-              </Text>            )}
+            </Row>
+            {findText && (
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>
+                {findCount > 0 ? findCount + ' match' + (findCount !== 1 ? 'es' : '') + ' found' : 'No matches found'}
+              </Text>
+            )}
           </View>
         </View>
       </Modal>
-    </View>  );
+    </View>
+  );
 }
 
 function BuildStageBar({ stage, progress, palette }: { stage: string; progress: number; palette: any }) {
@@ -784,25 +800,31 @@ function BuildStageBar({ stage, progress, palette }: { stage: string; progress: 
 
   return (
     <View style={{ marginBottom: 8 }}>
-      <Row gap={2}>        {stages.map((s, i) => {
+      <Row gap={2}>
+        {stages.map((s, i) => {
           const reached = !failed && activeIdx >= i;
           const active = !failed && activeIdx === i;
           const color = failed ? palette.danger : reached ? colors[stage] : palette.surfaceBorder;
           return (
             <View key={s} style={{ flex: 1 }}>
               <View style={{ height: 4, borderRadius: 2, backgroundColor: color }} />
-              <Text                style={{
+              <Text
+                style={{
                   color: active ? colors[stage] : palette.textMuted,
                   fontSize: 9,
                   marginTop: 2,
                   textAlign: 'center',
                 }}
-              >                {stageLabels[s] ?? s}
+              >
+                {stageLabels[s] ?? s}
               </Text>
-            </View>          );
+            </View>
+          );
         })}
-      </Row>      {(stage === 'uploading' || stage === 'connecting' || stage === 'verifying') && progress > 0 && (
-        <View          style={{
+      </Row>
+      {(stage === 'uploading' || stage === 'connecting' || stage === 'verifying') && progress > 0 && (
+        <View
+          style={{
             height: 3,
             borderRadius: 1.5,
             backgroundColor: palette.surfaceBorder,
@@ -810,10 +832,13 @@ function BuildStageBar({ stage, progress, palette }: { stage: string; progress: 
             overflow: 'hidden',
           }}
         >
-          <View            style={{ height: '100%', width: Math.round(progress * 100) + '%', backgroundColor: palette.accent } as ViewStyle}
+          <View
+            style={{ height: '100%', width: Math.round(progress * 100) + '%', backgroundColor: palette.accent } as ViewStyle}
           />
-        </View>      )}
-    </View>  );
+        </View>
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -848,16 +873,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 12,
     marginBottom: 8,
+  },
+  boardPicker: {
     padding: 10,
     borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  boardList: {
+    position: 'absolute',
+    top: 60,
+    left: 12,
+    right: 12,
+    maxHeight: 200,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 100,
+  },
+  boardItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  bottomPanel: {
+    padding: 12,
+    borderTopWidth: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
   },
-  boardPicker: { paddingVertical: 4 },
-  boardList: { paddingHorizontal: 12, paddingBottom: 8 },
-  boardItem: { paddingVertical: 8, borderBottomWidth: 0.5, borderColor: 'rgba(150,150,150,0.2)' },
-  bottomPanel: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
-  deviceItem: { paddingVertical: 10, borderBottomWidth: 0.5 },
-  findInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14 },
-  modalContent: { borderRadius: 14, padding: 16, borderWidth: 1, margin: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  deviceItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+  },
+  findInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 13,
+  },
 });
