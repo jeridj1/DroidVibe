@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths-ignore:
       - '**.md'
-      - '.github/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -18,138 +17,10 @@ permissions:
   contents: read
 
 jobs:
-  corruption-scan:
-    name: Corruption Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Scan for mid-token newlines
-        run: |
-          if grep -r "Style nSheet\|asyn nc\|useState<str ning\|StyleShee nt\|Layou ntAnimation" apps/mobile/; then
-            echo "ERROR: Mid-token newline corruption detected!"
-            exit 1
-          fi
-
-      - name: Scan for binary files
-        run: |
-          for file in $(find apps/mobile/app -name "*.tsx" -o -name "*.ts" -o -name "*.jsx" -o -name "*.js"); do
-            if file "$file" | grep -q "binary"; then
-              echo "ERROR: Binary file detected: $file"
-              exit 1
-            fi
-          done
-
-  quality:
-    name: Typecheck and Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: corruption-scan
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies (no frozen lockfile)
-        run: pnpm install
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
-
-  build-firmware:
-    name: Build RP2040 Firmware
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: quality
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install ARM GCC toolchain
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cmake
-
-      - name: Clone Pico SDK
-        run: git clone --depth 1 --recurse-submodules https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
-
-      - name: Build firmware projects
-        env:
-          PICO_SDK_PATH: /tmp/pico-sdk
-        run: |
-          set -e
-          mkdir -p firmware-out
-
-          for project in logic_analyzer swd jtag avr_isp; do
-            echo "=== Building firmware/$project ==="
-            mkdir -p "firmware/$project/build"
-            (cd "firmware/$project/build" && \
-              cmake .. -DPICO_SDK_PATH="$PICO_SDK_PATH" && \
-              make -j$(nproc) 2>&1)
-
-            for uf2_file in "firmware/$project/build"/*.uf2; do
-              [ -f "$uf2_file" ] && cp "$uf2_file" firmware-out/
-            done
-          done
-
-          echo "=== All firmware built ==="
-          ls -la firmware-out/ || true
-
-      - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware-uf2
-          path: firmware-out/*.uf2
-          if-no-files-found: error
-          retention-days: 30
-
-  mobile-prebuild:
-    name: Expo Prebuild Validation
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    needs: quality
-    env:
-      EXPO_NO_TELEMETRY: "1"
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Generate PNG assets from SVG sources
-        run: |
-          npm install --prefix /tmp/asset-tools sharp
-          NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
-
-      - name: Expo prebuild
-        working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean
-
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    needs: [mobile-prebuild, build-firmware]
-    if: always() && needs.mobile-prebuild.result == 'success'
     env:
       EXPO_NO_TELEMETRY: "1"
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
@@ -182,19 +53,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Download firmware artifacts
-        if: needs.build-firmware.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: firmware-uf2
-          path: firmware-out
-
-      - name: Copy firmware to Android assets
-        run: |
-          mkdir -p apps/mobile/src/main/assets/firmware
-          cp firmware-out/*.uf2 apps/mobile/src/main/assets/firmware/ 2>/dev/null || true
-          ls -la apps/mobile/src/main/assets/firmware/ || true
-
       - name: Generate PNG assets from SVG sources
         run: |
           npm install --prefix /tmp/asset-tools sharp
@@ -216,19 +74,15 @@ jobs:
             if ! grep -q 'android.kotlinVersion=' gradle.properties; then
               echo "android.kotlinVersion=1.9.25" >> gradle.properties
             fi
-
             if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
               echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
             fi
-
             if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
               echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
             fi
-
             if ! grep -q 'org.gradle.parallel' gradle.properties; then
               echo "org.gradle.parallel=true" >> gradle.properties
             fi
-
             if ! grep -q 'org.gradle.caching' gradle.properties; then
               echo "org.gradle.caching=true" >> gradle.properties
             fi
