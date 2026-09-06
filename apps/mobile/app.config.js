@@ -1,5 +1,5 @@
 /**
- * DroidVibe FIXED Expo app config with Kotlin version override + JVM target fix.
+ * DroidVibe Expo app config with Kotlin version override + JVM target fix.
  *
  * Expo SDK 52 ships with Kotlin 1.9.24, but the Compose Compiler 1.5.15
  * (used by expo-modules-core with newArchEnabled) requires Kotlin 1.9.25.
@@ -76,7 +76,7 @@ function withKotlinVersion(config) {
       cfg.modResults.properties.push({ key: 'org.gradle.caching', value: 'true' });
     }
 
-    console.log('[DroidVibe FIXED] withKotlinVersion plugin applied - gradle.properties patched');
+    console.log('[DroidVibe] withKotlinVersion plugin applied - gradle.properties patched');
     return cfg;
   });
 }
@@ -90,7 +90,7 @@ function withBuildConfigEnabled(config) {
     if (!/namespace\s+"com\.droidvibe\.app"/.test(contents)) {
       if (/namespace\s+"[^"]*"/.test(contents)) {
         contents = contents.replace(/namespace\s+"[^"]*"/, 'namespace "com.droidvibe.app"');
-        console.log('[DroidVibe FIXED] Fixed namespace to com.droidvibe.app in app/build.gradle');
+        console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
         modified = true;
       }
     }
@@ -100,14 +100,14 @@ function withBuildConfigEnabled(config) {
       if (/buildFeatures\s*{/.test(contents)) {
         contents = contents.replace(/(buildFeatures\s*{)/, `$1
         buildConfig = true`);
-        console.log('[DroidVibe FIXED] Added buildConfig = true to existing buildFeatures block');
+        console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
         modified = true;
       } else if (/android\s*{/.test(contents)) {
         contents = contents.replace(/(android\s*{)/, `$1
     buildFeatures {
         buildConfig = true
     }`);
-        console.log('[DroidVibe FIXED] Added buildFeatures block with buildConfig = true');
+        console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
         modified = true;
       }
     }
@@ -118,7 +118,7 @@ function withBuildConfigEnabled(config) {
         contents = contents.replace(/compileOptions\s*{/, `compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17`);
-        console.log('[DroidVibe FIXED] Added Java 17 compatibility to compileOptions');
+        console.log('[DroidVibe] Added Java 17 compatibility to compileOptions');
         modified = true;
       }
     }
@@ -128,7 +128,7 @@ function withBuildConfigEnabled(config) {
       if (/kotlinOptions\s*{/.test(contents)) {
         contents = contents.replace(/kotlinOptions\s*{/, `kotlinOptions {
         jvmTarget = '17'`);
-        console.log('[DroidVibe FIXED] Added jvmTarget = 17 to kotlinOptions');
+        console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
         modified = true;
       }
     }
@@ -138,7 +138,7 @@ function withBuildConfigEnabled(config) {
       if (/kotlinOptions\s*{/.test(contents)) {
         contents = contents.replace(/kotlinOptions\s*{/, `kotlinOptions {
         freeCompilerArgs += ['-P', 'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true']`);
-        console.log('[DroidVibe FIXED] Added suppressKotlinVersionCompatibilityCheck for Compose');
+        console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
         modified = true;
       }
     }
@@ -152,7 +152,7 @@ function withBuildConfigEnabled(config) {
 
 module.exports = {
   expo: {
-    name: 'DroidVibe FIXED',
+    name: 'DroidVibe',
     slug: 'droidvibe',
     scheme: 'droidvibe',
     version: '1.0.0',
