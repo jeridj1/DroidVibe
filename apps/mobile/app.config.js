@@ -100,14 +100,16 @@ function withBuildConfigEnabled(config) {
       if (/buildFeatures\s*{/.test(contents)) {
         contents = contents.replace(/(buildFeatures\s*{)/, `$1
         buildConfig = true`);
+        console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
+        modified = true;
       } else if (/android\s*{/.test(contents)) {
         contents = contents.replace(/(android\s*{)/, `$1
     buildFeatures {
         buildConfig = true
     }`);
+        console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
+        modified = true;
       }
-      console.log('[DroidVibe] Added buildConfig = true');
-      modified = true;
     }
 
     // Set Java compatibility to 17
