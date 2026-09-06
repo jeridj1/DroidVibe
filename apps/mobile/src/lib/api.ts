@@ -1,14 +1,13 @@
 /**
- * Typed RPC client for the DroidVibe backend. Calls POST /rpc/<ns>/<proc>.
- * Falls back to a clear offline error when the backend is unreachable.
- *
- * AI features (explainError, generate, fix) work WITHOUT a backend when
- * the user provides an API key in Settings — calls go directly to the AI
- * provider from the phone via direct-ai.ts.
+ * API client for DroidVibe.
+ * - Compilation is done locally on-device (no backend needed).
+ * - AI features work WITHOUT a backend when the user provides an API key.
+ * - Backend is only used for cloud features (e.g., sketch sync).
  */
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { directAi } from './direct-ai';
+import { compileSketch, isAvrGccInstalled, isArduinoCliInstalled, installAvrGcc, installArduinoCli } from './compiler';
 
 const DEFAULT_BASE =
   ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
@@ -35,6 +34,82 @@ export async function invalidateApiBaseCache(): Promise<void> {
   cachedBase = null;
 }
 
+/**
+ * Compile a sketch locally on-device using avr-gcc + arduino-cli.
+ * Falls back to backend if local compilation fails (for debugging).
+ */
+export async function compileLocal(
+  input: {
+    name: string;
+    fqbn: string;
+    files: Array<{ path: string; content: string }>;
+  },
+  onProgress?: (progress: number, message: string) => void
+): Promise<{
+  ok: boolean;
+  diagnostics: Array<{ file: string; line: number; column: number; message: string; severity: string }>;
+  firmware?: string;
+  firmwarePath?: string;
+  durationMs: number;
+  stdout: string;
+}> {
+  try {
+    // Ensure tools are installed
+    if (!(await isAvrGccInstalled()) || !(await isArduinoCliInstalled())) {
+      onProgress?.(0, 'Installing compiler tools...');
+      const gccInstalled = await installAvrGcc(onProgress);
+      const cliInstalled = await installArduinoCli(onProgress);
+      if (!gccInstalled || !cliInstalled) {
+        return {
+          ok: false,
+          diagnostics: [],
+          firmware: undefined,
+          firmwarePath: undefined,
+          durationMs: 0,
+          stdout: 'Failed to install compiler tools. Check your internet connection.',
+        };
+      }
+    }
+
+    // Compile locally
+    const startTime = Date.now();
+    const result = await compileSketch(input.files[0].content, input.fqbn, onProgress);
+    const durationMs = Date.now() - startTime;
+
+    if (result.success && result.hex) {
+      return {
+        ok: true,
+        diagnostics: [],
+        firmware: result.hex,
+        firmwarePath: undefined,
+        durationMs,
+        stdout: 'Compilation successful.',
+      };
+    } else {
+      return {
+        ok: false,
+        diagnostics: [{ file: input.files[0].path, line: 0, column: 0, message: result.error || 'Compilation failed', severity: 'error' }],
+        firmware: undefined,
+        firmwarePath: undefined,
+        durationMs,
+        stdout: result.error || 'Compilation failed.',
+      };
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      diagnostics: [{ file: input.files[0].path, line: 0, column: 0, message: `Compilation error: ${e}`, severity: 'error' }],
+      firmware: undefined,
+      firmwarePath: undefined,
+      durationMs: 0,
+      stdout: `Compilation error: ${e}`,
+    };
+  }
+}
+
+/**
+ * Fallback: Call backend for compilation (for debugging or if local compilation fails).
+ */
 async function rpc<T>(path: string, input: unknown): Promise<T> {
   try {
     const base = await ensureApiBase();
@@ -51,20 +126,42 @@ async function rpc<T>(path: string, input: unknown): Promise<T> {
   }
 }
 
+/**
+ * Compile a sketch. Uses local compilation by default, falls back to backend if needed.
+ */
 export const api = {
-  compile: (input: {
+  compile: async (input: {
     name: string;
     fqbn: string;
     files: Array<{ path: string; content: string }>;
-  }) =>
-    rpc<{
-      ok: boolean;
-      diagnostics: unknown[];
-      firmware?: string;
-      firmwarePath?: string;
-      durationMs: number;
-      stdout: string;
-    }>('compile', input),
+  }, onProgress?: (progress: number, message: string) => void) => {
+    // Try local compilation first
+    try {
+      return await compileLocal(input, onProgress);
+    } catch (e) {
+      console.warn('Local compilation failed, falling back to backend:', e);
+      // Fallback to backend (for debugging or if local tools are missing)
+      try {
+        return await rpc<{
+          ok: boolean;
+          diagnostics: unknown[];
+          firmware?: string;
+          firmwarePath?: string;
+          durationMs: number;
+          stdout: string;
+        }>('compile', input);
+      } catch (backendError) {
+        return {
+          ok: false,
+          diagnostics: [{ file: input.files[0].path, line: 0, column: 0, message: `Compilation failed: ${backendError}`, severity: 'error' }],
+          firmware: undefined,
+          firmwarePath: undefined,
+          durationMs: 0,
+          stdout: `Compilation failed: ${backendError}`,
+        };
+      }
+    }
+  },
   diagnostics: { explain: (input: unknown) => rpc('diagnostics/explain', input) },
   boards: { list: (input: { query?: string }) => rpc('boards/list', input) },
   libraries: { list: (input: { query?: string }) => rpc('libraries/list', input) },
