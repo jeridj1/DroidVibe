@@ -1,15 +1,5 @@
 /**
- * DroidVibe Expo app config with Kotlin version override + JVM target fix.
- *
- * Expo SDK 52 ships with Kotlin 1.9.24, but the Compose Compiler 1.5.15
- * (used by expo-modules-core with newArchEnabled) requires Kotlin 1.9.25.
- * Additionally, SDK 52 + Java 17 can trigger JVM target mismatch errors
- * between compileJavaWithJavac (17) and kspReleaseKotlin (21).
- * This config plugin patches gradle.properties after prebuild to fix both.
- *
- * Also enables buildFeatures.buildConfig = true in app/build.gradle, which
- * is required because AGP 8.x disables BuildConfig generation by default
- * but the generated MainActivity.kt and MainApplication.kt reference it.
+ * DroidVibe Expo app config - minimal working version
  */
 
 const { withGradleProperties, withAppBuildGradle } = require('@expo/config-plugins');
@@ -86,62 +76,27 @@ function withBuildConfigEnabled(config) {
     let contents = cfg.modResults.contents;
     let modified = false;
 
-    // Fix namespace to match app.json
-    const namespaceRegex = /namespace\s+"[^"]*"/;
-    const targetNamespace = 'namespace "com.droidvibe.app"';
-    if (!contents.includes('namespace "com.droidvibe.app"')) {
-      if (namespaceRegex.test(contents)) {
-        contents = contents.replace(namespaceRegex, targetNamespace);
-        console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
-        modified = true;
-      }
-    }
+    // Simple string replacements without complex regex
+    const fixes = [
+      { pattern: 'namespace "com.example.app"', replacement: 'namespace "com.droidvibe.app"' },
+      { pattern: 'buildFeatures {', replacement: 'buildFeatures {
+        buildConfig = true' },
+      { pattern: 'android {', replacement: 'android {
+    buildFeatures {
+        buildConfig = true
+    }' },
+      { pattern: 'compileOptions {', replacement: 'compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17' },
+      { pattern: 'kotlinOptions {', replacement: 'kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += ['-P', 'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true']' }
+    ];
 
-    // Ensure buildConfig is enabled
-    const buildConfigRegex = /buildConfig\s*=\s*true/;
-    if (!buildConfigRegex.test(contents)) {
-      const buildFeaturesRegex = /buildFeatures\s*{/;
-      if (buildFeaturesRegex.test(contents)) {
-        contents = contents.replace(buildFeaturesRegex, '$1\n        buildConfig = true');
-        console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
-        modified = true;
-      } else {
-        const androidRegex = /android\s*{/;
-        if (androidRegex.test(contents)) {
-          contents = contents.replace(androidRegex, '$1\n    buildFeatures {\n        buildConfig = true\n    }');
-          console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
-          modified = true;
-        }
-      }
-    }
-
-    // Set Java compatibility to 17
-    const javaCompatRegex = /sourceCompatibility\s+JavaVersion\.VERSION_17/;
-    if (!javaCompatRegex.test(contents)) {
-      const compileOptionsRegex = /compileOptions\s*{/;
-      if (compileOptionsRegex.test(contents)) {
-        contents = contents.replace(compileOptionsRegex, 'compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17');
-        console.log('[DroidVibe] Added Java 17 compatibility to compileOptions');
-        modified = true;
-      }
-    }
-
-    // Set Kotlin JVM target to 17
-    const jvmTargetRegex = /jvmTarget\s*=\s*['"\]17['"\]/;
-    if (!jvmTargetRegex.test(contents)) {
-      const kotlinOptionsRegex = /kotlinOptions\s*{/;
-      if (kotlinOptionsRegex.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        jvmTarget = \'17\'');
-        console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
-        modified = true;
-      }
-    }
-
-    // Suppress Kotlin version compatibility check for Compose
-    if (!contents.includes('suppressKotlinVersionCompatibilityCheck')) {
-      if (kotlinOptionsRegex.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        freeCompilerArgs += [\'-P\', \'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true\']');
-        console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
+    for (const fix of fixes) {
+      if (contents.includes(fix.pattern) && !contents.includes(fix.replacement)) {
+        contents = contents.replace(fix.pattern, fix.replacement);
+        console.log(`[DroidVibe] Applied fix: ${fix.pattern} -> ${fix.replacement.substring(0, 50)}...`);
         modified = true;
       }
     }
