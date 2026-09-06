@@ -1,0 +1,1 @@
+const regex = /test\s+/;
