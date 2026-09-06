@@ -87,39 +87,50 @@ function withBuildConfigEnabled(config) {
     let modified = false;
 
     // Fix namespace to match app.json
-    if (!/namespace\s+"com\.droidvibe\.app"/.test(contents)) {
-      if (/namespace\s+"[^"]*"/.test(contents)) {
-        contents = contents.replace(/namespace\s+"[^"]*"/, 'namespace "com.droidvibe.app"');
+    const namespaceRegex = /namespace\s+"[^"]*"/;
+    const targetNamespace = 'namespace "com.droidvibe.app"';
+    if (!contents.includes('namespace "com.droidvibe.app"')) {
+      if (namespaceRegex.test(contents)) {
+        contents = contents.replace(namespaceRegex, targetNamespace);
         console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
         modified = true;
       }
     }
 
     // Ensure buildConfig is enabled
-    if (!/buildConfig\s*=\s*true/.test(contents)) {
-      if (/buildFeatures\s*{/.test(contents)) {
-        contents = contents.replace(/(buildFeatures\s*{)/, '$1\n        buildConfig = true');
+    const buildConfigRegex = /buildConfig\s*=\s*true/;
+    if (!buildConfigRegex.test(contents)) {
+      const buildFeaturesRegex = /buildFeatures\s*{/;
+      if (buildFeaturesRegex.test(contents)) {
+        contents = contents.replace(buildFeaturesRegex, '$1\n        buildConfig = true');
         console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
         modified = true;
-      } else if (/android\s*{/.test(contents)) {
-        contents = contents.replace(/(android\s*{)/, '$1\n    buildFeatures {\n        buildConfig = true\n    }');
-        console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
-        modified = true;
+      } else {
+        const androidRegex = /android\s*{/;
+        if (androidRegex.test(contents)) {
+          contents = contents.replace(androidRegex, '$1\n    buildFeatures {\n        buildConfig = true\n    }');
+          console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
+          modified = true;
+        }
       }
     }
 
     // Set Java compatibility to 17
-    if (!/sourceCompatibility\s+JavaVersion\.VERSION_17/.test(contents)) {
-      if (/compileOptions\s*{/.test(contents)) {
-        contents = contents.replace(/compileOptions\s*{/, 'compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17');
+    const javaCompatRegex = /sourceCompatibility\s+JavaVersion\.VERSION_17/;
+    if (!javaCompatRegex.test(contents)) {
+      const compileOptionsRegex = /compileOptions\s*{/;
+      if (compileOptionsRegex.test(contents)) {
+        contents = contents.replace(compileOptionsRegex, 'compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17');
         console.log('[DroidVibe] Added Java 17 compatibility to compileOptions');
         modified = true;
       }
     }
 
     // Set Kotlin JVM target to 17
-    if (!/jvmTarget\s*=\s*['"\]17['"\]/.test(contents)) {
-      if (/kotlinOptions\s*{/.test(contents)) {
+    const jvmTargetRegex = /jvmTarget\s*=\s*['"\]17['"\]/;
+    if (!jvmTargetRegex.test(contents)) {
+      const kotlinOptionsRegex = /kotlinOptions\s*{/;
+      if (kotlinOptionsRegex.test(contents)) {
         contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        jvmTarget = \'17\'');
         console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
         modified = true;
@@ -127,8 +138,8 @@ function withBuildConfigEnabled(config) {
     }
 
     // Suppress Kotlin version compatibility check for Compose
-    if (!/suppressKotlinVersionCompatibilityCheck/.test(contents)) {
-      if (/kotlinOptions\s*{/.test(contents)) {
+    if (!contents.includes('suppressKotlinVersionCompatibilityCheck')) {
+      if (kotlinOptionsRegex.test(contents)) {
         contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        freeCompilerArgs += [\'-P\', \'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true\']');
         console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
         modified = true;
