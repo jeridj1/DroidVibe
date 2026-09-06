@@ -1,0 +1,87 @@
+name: Cleanup Redundant Branches
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete-branches:
+    name: Delete Redundant Branches
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      branches: write
+    steps:
+      - name: Delete v-droidvibe-test
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/v-droidvibe-test'
+              });
+              console.log('Deleted branch: v-droidvibe-test');
+            } catch (e) {
+              console.log('Failed to delete v-droidvibe-test:', e.message);
+            }
+
+      - name: Delete diagnose-usb
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/diagnose-usb'
+              });
+              console.log('Deleted branch: diagnose-usb');
+            } catch (e) {
+              console.log('Failed to delete diagnose-usb:', e.message);
+            }
+
+      - name: Delete hardware-validation
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/hardware-validation'
+              });
+              console.log('Deleted branch: hardware-validation');
+            } catch (e) {
+              console.log('Failed to delete hardware-validation:', e.message);
+            }
+
+      - name: Delete playground/rebuild-2026-09-03
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/playground/rebuild-2026-09-03'
+              });
+              console.log('Deleted branch: playground/rebuild-2026-09-03');
+            } catch (e) {
+              console.log('Failed to delete playground/rebuild-2026-09-03:', e.message);
+            }
+
+      - name: Delete forensic-fix-v10
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/forensic-fix-v10'
+              });
+              console.log('Deleted branch: forensic-fix-v10');
+            } catch (e) {
+              console.log('Failed to delete forensic-fix-v10:', e.message);
+            }
