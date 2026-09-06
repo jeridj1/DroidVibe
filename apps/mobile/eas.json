@@ -1,0 +1,11 @@
+{
+  "build": {
+    "android": {
+      "buildType": "apk",
+      "image": "latest"
+    }
+  },
+  "submit": {
+    "android": {}
+  }
+}
