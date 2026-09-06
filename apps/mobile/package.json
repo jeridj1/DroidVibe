@@ -8,9 +8,9 @@
     "start": "expo start",
     "build": "eas build --platform android --profile debug",
     "build:android": "eas build --platform android --profile debug",
-    "build:android:local": "expo prebuild --platform android --clean && cd android && ./gradlew assembleDebug --no-daemon",
+    "build:android:local": "expo prebuild --platform android --clean && ./post-prebuild.sh && cd android && ./gradlew assembleDebug --no-daemon",
     "prebuild": "expo prebuild --platform android --clean",
-    "prebuild:android": "expo prebuild --platform android --clean",
+    "prebuild:android": "expo prebuild --platform android --clean && ./post-prebuild.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "echo no tests"
