@@ -87,40 +87,40 @@ function withBuildConfigEnabled(config) {
     let modified = false;
 
     // Fix namespace to match app.json
-    if (!/namespace\s+\"com\.droidvibe\.app\"/.test(contents)) {
-      if (/namespace\s+\"[^\"]*\"/.test(contents)) {
-        contents = contents.replace(/namespace\s+\"[^\"]*\" /, 'namespace "com.droidvibe.app"');
+    if (!/namespace\\s+\"com\\.droidvibe\\.app\"/.test(contents)) {
+      if (/namespace\\s+\"[^\\"]*\""/.test(contents)) {
+        contents = contents.replace(/namespace\\s+\"[^\\"]*\" /, 'namespace "com.droidvibe.app"');
         console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
         modified = true;
       }
     }
 
     // Ensure buildConfig is enabled
-    if (!/buildConfig\s*=\s*true/.test(contents)) {
-      if (/buildFeatures\s*{/.test(contents)) {
-        contents = contents.replace(/buildFeatures\s*{/, 'buildFeatures {\n        buildConfig = true');
+    if (!/buildConfig\\s*=\\s*true/.test(contents)) {
+      if (/buildFeatures\\s*{/.test(contents)) {
+        contents = contents.replace(/buildFeatures\\s*{/, 'buildFeatures {\\n        buildConfig = true');
         console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
         modified = true;
-      } else if (/android\s*{/.test(contents)) {
-        contents = contents.replace(/android\s*{/, 'android {\n    buildFeatures {\n        buildConfig = true\n    }');
+      } else if (/android\\s*{/.test(contents)) {
+        contents = contents.replace(/android\\s*{/, 'android {\\n    buildFeatures {\\n        buildConfig = true\\n    }');
         console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
         modified = true;
       }
     }
 
     // Set Java compatibility to 17
-    if (!/sourceCompatibility\s+JavaVersion\.VERSION_17/.test(contents)) {
-      if (/compileOptions\s*{/.test(contents)) {
-        contents = contents.replace(/compileOptions\s*{/, 'compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17');
+    if (!/sourceCompatibility\\s+JavaVersion\\.VERSION_17/.test(contents)) {
+      if (/compileOptions\\s*{/.test(contents)) {
+        contents = contents.replace(/compileOptions\\s*{/, 'compileOptions {\\n        sourceCompatibility JavaVersion.VERSION_17\\n        targetCompatibility JavaVersion.VERSION_17');
         console.log('[DroidVibe] Added Java 17 compatibility to compileOptions');
         modified = true;
       }
     }
 
     // Set Kotlin JVM target to 17
-    if (!/jvmTarget\s*=\s*['"]17['"]/.test(contents)) {
-      if (/kotlinOptions\s*{/.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        jvmTarget = \'17\'');
+    if (!/jvmTarget\\s*=\\s*[\\'\\"]17[\\'\\"]/.test(contents)) {
+      if (/kotlinOptions\\s*{/.test(contents)) {
+        contents = contents.replace(/kotlinOptions\\s*{/, 'kotlinOptions {\\n        jvmTarget = \\'17\\'');
         console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
         modified = true;
       }
@@ -128,8 +128,8 @@ function withBuildConfigEnabled(config) {
 
     // Suppress Kotlin version compatibility check for Compose
     if (!/suppressKotlinVersionCompatibilityCheck/.test(contents)) {
-      if (/kotlinOptions\s*{/.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        freeCompilerArgs += [\'-P\', \'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true\']');
+      if (/kotlinOptions\\s*{/.test(contents)) {
+        contents = contents.replace(/kotlinOptions\\s*{/, 'kotlinOptions {\\n        freeCompilerArgs += [\\'-P\\', \\'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true\\']');
         console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
         modified = true;
       }
