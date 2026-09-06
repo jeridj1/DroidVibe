@@ -51,8 +51,7 @@ function withKotlinVersion(config) {
       }
     }
     if (!foundJvmArgs) {
-      cfg.modResults.properties.push({ key: '
-org.gradle.jvmargs', value: '-Xmx3g' });
+      cfg.modResults.properties.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
     }
 
     let foundParallel = false;
@@ -99,37 +98,29 @@ function withBuildConfigEnabled(config) {
     // Ensure buildConfig is enabled
     if (!/buildConfig\s*=\s*true/.test(contents)) {
       if (/buildFeatures\s*{/.test(contents)) {
-        contents = contents.replace(/(buildFeatures\s*{)/, `$1
-        buildConfig = true`);
+        contents = contents.replace(/(buildFeatures\s*{)/, '$1\n        buildConfig = true');
         console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
         modified = true;
       } else if (/android\s*{/.test(contents)) {
-        contents = contents.replace(/(android\s*{)/, `$1
-    buildFeatures {
-        buildConfig = true
-    }`);
+        contents = contents.replace(/(android\s*{)/, '$1\n    buildFeatures {\n        buildConfig = true\n    }');
         console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
         modified = true;
       }
     }
 
-    // Set Java compa
-tibility to 17
+    // Set Java compatibility to 17
     if (!/sourceCompatibility\s+JavaVersion\.VERSION_17/.test(contents)) {
       if (/compileOptions\s*{/.test(contents)) {
-        contents = contents.replace(/compileOptions\s*{/, `compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17`);
+        contents = contents.replace(/compileOptions\s*{/, 'compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17');
         console.log('[DroidVibe] Added Java 17 compatibility to compileOptions');
         modified = true;
       }
     }
 
     // Set Kotlin JVM target to 17
-    if (!/jvmTarget\s*=\s*['"]17['"]/.test(contents)) {
+    if (!/jvmTarget\s*=\s*['"\]17['"\]/.test(contents)) {
       if (/kotlinOptions\s*{/.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, `kotlinOptions {
-        jvmTarget = '17'`);
+        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        jvmTarget = '17'');
         console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
         modified = true;
       }
@@ -138,8 +129,7 @@ tibility to 17
     // Suppress Kotlin version compatibility check for Compose
     if (!/suppressKotlinVersionCompatibilityCheck/.test(contents)) {
       if (/kotlinOptions\s*{/.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, `kotlinOptions {
-        freeCompilerArgs += ['-P', 'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true']`);
+        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        freeCompilerArgs += ['-P', 'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true']');
         console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
         modified = true;
       }
@@ -172,8 +162,7 @@ module.exports = {
       ],
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColo
-r: '#00979D'
+        backgroundColor: '#00979D'
       }
     },
     plugins: [withKotlinVersion, withBuildConfigEnabled],
