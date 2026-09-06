@@ -61,6 +61,10 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
 
+      - name: Run post-prebuild configuration
+        working-directory: apps/mobile
+        run: chmod +x post-prebuild.sh && ./post-prebuild.sh
+
       - name: Verify native USB module is autolinked
         working-directory: apps/mobile/android
         run: |
@@ -70,14 +74,7 @@ jobs:
           grep -n "useExpoModules\|autolinking" settings.gradle || echo "No autolinking found"
           echo ""
           echo "Module directory check:"
-          ls -la ../../packages/native-usb/android/build.gradle 2>/dev/null && echo "Module build.gradle exists" || echo "Module build.gradle NOT found"
-          echo ""
-          echo "NOTE: The nativeModulesDir config in package.json tells Expo autolinking"
-          echo "to search packages/ for local modules. useExpoModules() in settings.gradle"
-          echo "handles the actual module linking dynamically - no manual injection needed."
-          echo ""
-          echo "=== settings.gradle (last 10 lines) ==="
-          tail -10 settings.gradle
+          ls -la ../../../packages/native-usb/android/build.gradle 2>/dev/null && echo "Module build.gradle exists" || echo "Module build.gradle NOT found"
 
       - name: Patch build config
         working-directory: apps/mobile/android
@@ -93,18 +90,6 @@ jobs:
           fi
           if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
             echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
-          fi
-          if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
-            echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
-          fi
-          if ! grep -q 'org.gradle.parallel' gradle.properties; then
-            echo "org.gradle.parallel=true" >> gradle.properties
-          fi
-          if ! grep -q 'org.gradle.caching' gradle.properties; then
-            echo "org.gradle.caching=true" >> gradle.properties
-          fi
-          if [ -f build.gradle ]; then
-            sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
           fi
           echo "=== Final gradle.properties ==="
           cat gradle.properties

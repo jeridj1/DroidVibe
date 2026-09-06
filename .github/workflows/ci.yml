@@ -46,41 +46,28 @@ jobs:
 
       - name: Expo prebuild
         working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean
+        run: |
+          pnpm exec expo prebuild --platform android --no-install --clean
+
+      - name: Run post-prebuild configuration
+        working-directory: apps/mobile
+        run: chmod +x post-prebuild.sh && ./post-prebuild.sh
 
       - name: Accept SDK licenses and install components
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-34' 'build-tools;34.0.0' 'platform-tools' 'cmake;3.22.1' 2>&1 || true
 
-      - name: Patch build config
+      - name: Verify gradle.properties
         working-directory: apps/mobile/android
         run: |
-          if [ -f gradle.properties ]; then
-            if ! grep -q 'android.kotlinVersion=' gradle.properties; then
-              echo "android.kotlinVersion=1.9.25" >> gradle.properties
-            fi
-            if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
-              echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
-            fi
-            if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
-              echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
-            fi
-            if ! grep -q 'org.gradle.parallel' gradle.properties; then
-              echo "org.gradle.parallel=true" >> gradle.properties
-            fi
-            if ! grep -q 'org.gradle.caching' gradle.properties; then
-              echo "org.gradle.caching=true" >> gradle.properties
-            fi
-          else
-            cat > gradle.properties << EOF
-android.kotlinVersion=1.9.25
-kotlin.jvm.target.validation.mode=warning
-org.gradle.jvmargs=-Xmx3g
-org.gradle.parallel=true
-org.gradle.caching=true
-EOF
-          fi
+          echo "=== gradle.properties ==="
+          cat gradle.properties
+          echo ""
+          echo "=== Checking Kotlin version ==="
+          grep "android.kotlinVersion" gradle.properties || echo "WARNING: Kotlin version not set"
+          echo "=== Checking JVM validation mode ==="
+          grep "kotlin.jvm.target.validation.mode" gradle.properties || echo "WARNING: JVM validation mode not set"
 
       - name: Build debug APK
         working-directory: apps/mobile/android
