@@ -120,7 +120,7 @@ function withBuildConfigEnabled(config) {
     // Set Kotlin JVM target to 17
     if (!/jvmTarget\s*=\s*['"\]17['"\]/.test(contents)) {
       if (/kotlinOptions\s*{/.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        jvmTarget = '17'');
+        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        jvmTarget = \'17\'');
         console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
         modified = true;
       }
@@ -129,7 +129,7 @@ function withBuildConfigEnabled(config) {
     // Suppress Kotlin version compatibility check for Compose
     if (!/suppressKotlinVersionCompatibilityCheck/.test(contents)) {
       if (/kotlinOptions\s*{/.test(contents)) {
-        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        freeCompilerArgs += ['-P', 'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true']');
+        contents = contents.replace(/kotlinOptions\s*{/, 'kotlinOptions {\n        freeCompilerArgs += [\'-P\', \'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true\']');
         console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
         modified = true;
       }
