@@ -87,9 +87,9 @@ function withBuildConfigEnabled(config) {
     let modified = false;
 
     // Fix namespace to match app.json
-    if (!/namespace\s+\"com\.droidvibe\.app\"/.test(contents)) {
-      if (/namespace\s+\"[^\\"]*\""/.test(contents)) {
-        contents = contents.replace(/namespace\s+\"[^\\"]*\" /, 'namespace "com.droidvibe.app"');
+    if (!/namespace\s+"com\.droidvibe\.app"/.test(contents)) {
+      if (/namespace\s+"[^\"]*""/.test(contents)) {
+        contents = contents.replace(/namespace\s+"[^\"]*" /, 'namespace "com.droidvibe.app"');
         console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
         modified = true;
       }
