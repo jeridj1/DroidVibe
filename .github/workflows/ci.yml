@@ -39,6 +39,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify app.config.js syntax
+        run: node --check apps/mobile/app.config.js
+
+      - name: Run typecheck
+        run: pnpm typecheck
+
+      - name: Run lint
+        run: pnpm lint
+
       - name: Generate PNG assets from SVG sources
         run: |
           npm install --prefix /tmp/asset-tools sharp
