@@ -63,10 +63,13 @@ async function callOpenAI(apiKey: string, model: string, systemPrompt: string, u
 }
 
 async function callGoogle(apiKey: string, model: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
     body: JSON.stringify({
       contents: [
         { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPrompt }] },
@@ -106,19 +109,29 @@ export const directAi = {
   },
 
   explainError: async (input: { error: string; code?: string; board?: string }): Promise<{ explanation: string }> => {
-    const prompt = `Error: ${input.error}\n${input.code ? 'Code:\n' + input.code : ''}\n${input.board ? 'Board: ' + input.board : ''}\n\nExplain this error and how to fix it.`;
+    const prompt = `Error: ${input.error}
+${input.code ? 'Code:\n' + input.code : ''}
+${input.board ? 'Board: ' + input.board : ''}
+
+Explain this error and how to fix it.`;
     const text = await callAi(SYSTEM_PROMPTS.explainError, prompt);
     return { explanation: text };
   },
 
   generate: async (input: { prompt: string; boardFqbn?: string }): Promise<{ code: string }> => {
-    const prompt = `Generate Arduino code for: ${input.prompt}\n${input.boardFqbn ? 'Target board: ' + input.boardFqbn : ''}`;
+    const prompt = `Generate Arduino code for: ${input.prompt}
+${input.boardFqbn ? 'Target board: ' + input.boardFqbn : ''}`;
     const text = await callAi(SYSTEM_PROMPTS.generate, prompt);
     return { code: extractCode(text) };
   },
 
   fix: async (input: { code: string; error: string }): Promise<{ code: string }> => {
-    const prompt = `Fix this code that has compilation errors:\n\nError: ${input.error}\n\nCode:\n${input.code}`;
+    const prompt = `Fix this code that has compilation errors:
+
+Error: ${input.error}
+
+Code:
+${input.code}`;
     const text = await callAi(SYSTEM_PROMPTS.fix, prompt);
     return { code: extractCode(text) };
   },

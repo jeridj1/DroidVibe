@@ -33,7 +33,7 @@ if [ ! -f "gradle.properties" ] || ! grep -q "android.kotlinVersion=1.9.25" "gra
 android.kotlinVersion=1.9.25
 kotlin.code.style=official
 kotlin.jvm.target.validation.mode=warning
-org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g
+org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
 org.gradle.parallel=true
 org.gradle.caching=true
 org.gradle.daemon=false
@@ -58,7 +58,8 @@ if ! grep -q "useExpoModules" "settings.gradle"; then
     # Insert after pluginManagement if it exists, otherwise at the end
     if grep -q "pluginManagement" "settings.gradle"; then
       # Find the end of pluginManagement and insert before it
-      sed -i '/^}$/i\n// Expo autolinking
+      sed -i '/^}$/i\n// Expo autolink
+ing
 apply from: new File(["node", "--print", "require.resolve("expo-modules-core/package.json")"].execute().text.trim(), "scripts/autolinking.gradle")
 useExpoModules(this)' settings.gradle
     else
@@ -74,15 +75,7 @@ EOF
   fi
 fi
 
-# Ensure native-usb module is included
-if ! grep -q "native-usb" "settings.gradle"; then
-  echo "[DroidVibe] Adding native-usb module to settings.gradle..."
-  # Check if includeBuild exists for native-usb
-  if ! grep -q "includeBuild.*native-usb" "settings.gradle"; then
-    # Add after the app include
-    sed -i '/include :'app'/a includeBuild("../../../packages/native-usb")' settings.gradle
-    echo "[DroidVibe] Added native-usb module includeBuild"
-  fi
-fi
+# Note: native-usb module is now properly autolinked via expo.config.js
+# The manual inclusion has been removed as it is no longer needed
 
 echo "[DroidVibe] Post-prebuild configuration complete!"

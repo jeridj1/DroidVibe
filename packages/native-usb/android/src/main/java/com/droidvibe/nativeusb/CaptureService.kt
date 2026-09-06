@@ -2,6 +2,7 @@ package com.droidvibe.nativeusb
 
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.util.Base64
 import android.util.Log
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -31,11 +32,10 @@ object RP2040Controller {
     private const val TAG = "RP2040Controller"
 
     const val RP2040_VID = 0x2E8A
-    const val PID_BOOTSEL = 0x0003   // BOOTSEL mode (PICOBOOT + mass storage)
-    const val PID_SERIAL = 0x000A    // Pico SDK CDC default
+    const val PID_BOOTSEL = 0x0003
+    const val PID_SERIAL = 0x000A
     const val PID_MICROPYTHON = 0x0005
 
-    // Helper firmware mode commands (sent over CDC serial to the helper firmware)
     const val CMD_ENTER_LA_MODE: Byte = 0x02
     const val CMD_EXIT_LA_MODE: Byte = 0x03
     const val CMD_START_CAPTURE: Byte = 0x04
@@ -43,7 +43,6 @@ object RP2040Controller {
     const val CMD_ENTER_BOOTLOADER: Byte = 0x00
     const val CMD_ENTER_BOOTLOADER_ALT: Byte = 0x01
 
-    // SWD/JTAG commands
     const val CMD_SWD_WRITE: Byte = 0x10
     const val CMD_SWD_READ: Byte = 0x11
     const val CMD_JTAG_WRITE: Byte = 0x20
@@ -53,33 +52,24 @@ object RP2040Controller {
 
     data class CaptureResult(
         val actualSamples: Int,
- 
-       val durationUs: Long,
+        val durationUs: Long,
         val data: ByteArray,
         val sampleRate: Int,
         val channels: Int,
     )
 
-    /** Check if a USB device is an RP2040 in any mode. */
     fun isRP2040(device: UsbDevice): Boolean =
         device.vendorId == RP2040_VID &&
             (device.productId == PID_BOOTSEL ||
                 device.productId == PID_SERIAL ||
                 device.productId == PID_MICROPYTHON)
 
-    /** Check if a device is an RP2040 in BOOTSEL mode (ready for PICOBOOT flashing). */
     fun isBootSel(device: UsbDevice): Boolean =
         device.vendorId == RP2040_VID && device.productId == PID_BOOTSEL
 
-    /** Check if a device is an RP2040 running application firmware (helper or user). */
     fun isApplicationMode(device: UsbDevice): Boolean =
         device.vendorId == RP2040_VID && device.productId != PID_BOOTSEL
 
-    /**
-     * Capture logic-analyzer data from an RP2040 running the logic-analyzer
-     * helper firmware. The Pico must already be flashed with the LA helper
-     * and connected in application mode.
-     */
     fun capture(
         driver: UsbSerialDriver,
         sampleRate: Int,
@@ -120,11 +110,6 @@ object RP2040Controller {
         return CaptureResult(actual, durationUs, sampleBytes, sampleRate, channels)
     }
 
-    /**
-     * Send the Pico back to BOOTSEL mode so it can be reflashed.
-     * Works only if the Pico is running helper firmware that listens for
-     * CMD_ENTER_BOOTLOADER. If the firmware is hung, hold BOOTSEL while plugging in.
-     */
     fun enterBootselViaSerial(driver: UsbSerialDriver): Boolean {
         return try {
             driver.write(byteArrayOf(CMD_ENTER_BOOTLOADER))
@@ -136,10 +121,6 @@ object RP2040Controller {
         }
     }
 
-    /**
-     * Send a JTAG command to the Pico running the JTAG helper firmware.
-     * Returns the response bytes read from the target.
-     */
     fun jtagTransfer(
         driver: UsbSerialDriver,
         tms: ByteArray,
@@ -157,17 +138,13 @@ object RP2040Controller {
         return driver.synchronizedRead(responseLen, 2000)
     }
 
-    /**
-     * Send an SWD read/write command to the Pico running the SWD helper firmware.
-     */
     fun swdTransfer(
         driver: UsbSerialDriver,
         isRead: Boolean,
         apDp: Int,
         addr: Int,
         data: Int,
-    ): Int 
-{
+    ): Int {
         val cmd = ByteBuffer.allocate(10).order(ByteOrder.LITTLE_ENDIAN)
         cmd.put(if (isRead) CMD_SWD_READ else CMD_SWD_WRITE)
         cmd.put(apDp.toByte())
@@ -180,6 +157,3 @@ object RP2040Controller {
         return ByteBuffer.wrap(resp).order(ByteOrder.LITTLE_ENDIAN).int
     }
 }
-
-// Re-export under the old name so existing callers compile
-typealias CaptureService = RP2040Controller

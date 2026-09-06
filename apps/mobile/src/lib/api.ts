@@ -9,9 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { directAi } from './direct-ai';
 import { compileSketch, isAvrGccInstalled, isArduinoCliInstalled, installAvrGcc, installArduinoCli } from './compiler';
 
-const DEFAULT_BASE =
-  ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
-    'http://localhost:3001');
+const DEFAULT_BASE = ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) || '');
 
 let cachedBase: string | null = null;
 
@@ -53,8 +51,24 @@ export async function compileLocal(
   durationMs: number;
   stdout: string;
 }> {
+  if (!input.files || input.files.length === 0) {
+    return {
+      ok: false,
+      diagnostics: [{ 
+        file: '', 
+        line: 0, 
+        column: 0, 
+        message: 'No files provided for compilation', 
+        severity: 'error' 
+      }],
+      firmware: undefined,
+      firmwarePath: undefined,
+      durationMs: 0,
+      stdout: 'Validation failed: No files provided'
+    };
+  }
+
   try {
-    // Ensure tools are installed
     if (!(await isAvrGccInstalled()) || !(await isArduinoCliInstalled())) {
       onProgress?.(0, 'Installing compiler tools...');
       const gccInstalled = await installAvrGcc(onProgress);
@@ -71,7 +85,6 @@ export async function compileLocal(
       }
     }
 
-    // Compile locally
     const startTime = Date.now();
     const result = await compileSketch(input.files[0].content, input.fqbn, onProgress);
     const durationMs = Date.now() - startTime;
@@ -107,12 +120,12 @@ export async function compileLocal(
   }
 }
 
-/**
- * Fallback: Call backend for compilation (for debugging or if local compilation fails).
- */
 async function rpc<T>(path: string, input: unknown): Promise<T> {
   try {
     const base = await ensureApiBase();
+    if (!base) {
+      throw new Error('No API base URL configured. Set DROIDVIBE_API_URL in app config or settings.');
+    }
     const res = await fetch(base + '/rpc/' + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -126,21 +139,16 @@ async function rpc<T>(path: string, input: unknown): Promise<T> {
   }
 }
 
-/**
- * Compile a sketch. Uses local compilation by default, falls back to backend if needed.
- */
 export const api = {
   compile: async (input: {
     name: string;
     fqbn: string;
     files: Array<{ path: string; content: string }>;
   }, onProgress?: (progress: number, message: string) => void) => {
-    // Try local compilation first
     try {
       return await compileLocal(input, onProgress);
     } catch (e) {
       console.warn('Local compilation failed, falling back to backend:', e);
-      // Fallback to backend (for debugging or if local tools are missing)
       try {
         return await rpc<{
           ok: boolean;

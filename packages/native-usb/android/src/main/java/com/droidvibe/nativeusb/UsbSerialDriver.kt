@@ -11,15 +11,16 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * USB serial driver supporting CDC-ACM and bridge chips CH340/CP210x/FTDI.
- */
 class UsbSerialDriver(
     private val usbManager: UsbManager,
     private val device: UsbDevice,
     private val onData: (ByteArray) -> Unit,
 ) {
-    companion object { private const val TAG = "UsbSerialDriver" }
+    companion object { 
+        private const val TAG = "UsbSerialDriver"
+        private const val DEFAULT_READ_TIMEOUT = 100
+        private const val DEFAULT_WRITE_TIMEOUT = 1000
+    }
 
     private var connection: UsbDeviceConnection? = null
     private var iface: UsbInterface? = null
@@ -57,15 +58,30 @@ class UsbSerialDriver(
         setControlLines(dtr, rts)
         readQueue.clear()
         running.set(true)
-        readThread = Thread { readLoop() }.apply { isDaemon = true; name = "droidvibe-serial-read"; start() }
+        readThread = Thread { readLoop() }.apply { 
+            isDaemon = true; 
+            name = "droidvibe-serial-read"; 
+            start() 
+        }
         return true
     }
 
     fun write(data: ByteArray): Int {
         val conn = connection ?: return -1
         val ep = outEp ?: return -1
-        val n = conn.bulkTransfer(ep, data, data.size, 1000)
+        val n = conn.bulkTransfer(ep, data, data.size, DEFAULT_WRITE_TIMEOUT)
         return if (n >= 0) n else -1
+    }
+
+    fun writeWithRetry(data: ByteArray, maxRetries: Int = 3): Int {
+        var lastError: Int = -1
+        for (attempt in 1..maxRetries) {
+            val result = write(data)
+            if (result >= 0) return result
+            lastError = result
+            Thread.sleep(50 * attempt.toLong())
+        }
+        return lastError
     }
 
     @Synchronized
@@ -90,14 +106,15 @@ class UsbSerialDriver(
 
     fun close() {
         running.set(false)
-        runCatching { readThread?.interrupt() }
+        readThread?.interrupt()
+        readThread?.join(1000)
+        readQueue.clear()
         iface?.let { connection?.releaseInterface(it) }
         runCatching { connection?.close() }
         connection = null
         iface = null
         inEp = null
         outEp = null
-        readQueue.clear()
     }
 
     private fun readLoop() {
@@ -105,10 +122,17 @@ class UsbSerialDriver(
         val conn = connection ?: return
         val ep = inEp ?: return
         while (running.get()) {
-            val n = conn.bulkTransfer(ep, buf, buf.size, 100)
-            if (n > 0) {
-                onData(buf.copyOfRange(0, n))
-                for (i in 0 until n) { readQueue.offer(buf[i]) }
+            try {
+                val n = conn.bulkTransfer(ep, buf, buf.size, DEFAULT_READ_TIMEOUT)
+                if (n > 0) {
+                    onData(buf.copyOfRange(0, n))
+                    for (i in 0 until n) { readQueue.offer(buf[i]) }
+                }
+            } catch (e: Exception) {
+                if (running.get()) {
+                    Log.e(TAG, "USB read error", e)
+                }
+                break
             }
         }
     }
