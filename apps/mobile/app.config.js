@@ -12,142 +12,139 @@
  * but the generated MainActivity.kt and MainApplication.kt reference it.
  */
 
-// Load config plugins with fallback for different export paths
-let withAppBuildGradle, withGradleProperties;
-try {
-  const plugins = require('expo/config-plugins');
-  withAppBuildGradle = plugins.withAppBuildGradle;
-  withGradleProperties = plugins.withGradleProperties;
-  console.log('[DroidVibe] Config plugins loaded from expo/config-plugins:', {
-    withAppBuildGradle: typeof withAppBuildGradle,
-    withGradleProperties: typeof withGradleProperties,
-  });
-} catch (e) {
-  console.warn('[DroidVibe] Failed to load config plugins from expo/config-plugins:', e.message);
-  try {
-    const plugins = require('@expo/config-plugins');
-    withAppBuildGradle = plugins.withAppBuildGradle;
-    withGradleProperties = plugins.withGradleProperties;
-    console.log('[DroidVibe] Config plugins loaded from @expo/config-plugins:', {
-      withAppBuildGradle: typeof withAppBuildGradle,
-      withGradleProperties: typeof withGradleProperties,
-    });
-  } catch (e2) {
-    console.warn('[DroidVibe] Failed to load config plugins from @expo/config-plugins:', e2.message);
-    console.warn('[DroidVibe] Config plugins will NOT run - CI fallback patch will handle buildConfig');
-  }
-}
-
-/**
- * Safely get the gradle.properties as an array of {key, value} objects.
- * Different versions of @expo/config-plugins may provide modResults
- * in different formats (PropertiesConfig object, raw string, or Map).
- */
-function getGradleProps(modResults) {
-  if (modResults && Array.isArray(modResults.properties)) {
-    return modResults;
-  }
-  if (typeof modResults === 'string') {
-    return null;
-  }
-  if (modResults && !Array.isArray(modResults.properties)) {
-    console.warn('[DroidVibe] modResults.properties is not iterable:', typeof modResults.properties);
-    if (typeof modResults === 'object' && modResults !== null) {
-      modResults.properties = [];
-      return modResults;
-    }
-  }
-  return null;
-}
+const { withGradleProperties, withAppBuildGradle } = require('@expo/config-plugins');
 
 function withKotlinVersion(config) {
-  if (!withGradleProperties) {
-    console.warn('[DroidVibe] withGradleProperties not available - skipping Kotlin version patch');
-    return config;
-  }
   return withGradleProperties(config, (cfg) => {
-    const modResults = getGradleProps(cfg.modResults);
-    if (!modResults) {
-      console.warn('[DroidVibe] Could not get gradle.properties - skipping Kotlin version patch');
-      return cfg;
-    }
-    const props = modResults.properties;
+    cfg.modResults.properties = cfg.modResults.properties || [];
+    
+    // Force Kotlin 1.9.25 for Compose Compiler compatibility
     let foundKotlin = false;
-    for (const prop of props) {
+    for (const prop of cfg.modResults.properties) {
       if (prop.key === 'android.kotlinVersion') {
         prop.value = '1.9.25';
         foundKotlin = true;
       }
     }
     if (!foundKotlin) {
-      props.push({ key: 'android.kotlinVersion', value: '1.9.25' });
+      cfg.modResults.properties.push({ key: 'android.kotlinVersion', value: '1.9.25' });
     }
+    
+    // Fix JVM target validation
     let foundJvmMode = false;
-    for (const prop of props) {
+    for (const prop of cfg.modResults.properties) {
       if (prop.key === 'kotlin.jvm.target.validation.mode') {
         prop.value = 'warning';
         foundJvmMode = true;
       }
     }
     if (!foundJvmMode) {
-      props.push({ key: 'kotlin.jvm.target.validation.mode', value: 'warning' });
+      cfg.modResults.properties.push({ key: 'kotlin.jvm.target.validation.mode', value: 'warning' });
     }
+    
+    // Gradle performance optimizations
     let foundJvmArgs = false;
-    for (const prop of props) {
+    for (const prop of cfg.modResults.properties) {
       if (prop.key === 'org.gradle.jvmargs') {
         prop.value = '-Xmx3g';
         foundJvmArgs = true;
       }
     }
     if (!foundJvmArgs) {
-      props.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
+      cfg.modResults.properties.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
     }
+    
+    let foundParallel = false;
+    for (const prop of cfg.modResults.properties) {
+      if (prop.key === 'org.gradle.parallel') {
+        prop.value = 'true';
+        foundParallel = true;
+      }
+    }
+    if (!foundParallel) {
+      cfg.modResults.properties.push({ key: 'org.gradle.parallel', value: 'true' });
+    }
+    
+    let foundCaching = false;
+    for (const prop of cfg.modResults.properties) {
+      if (prop.key === 'org.gradle.caching') {
+        prop.value = 'true';
+        foundCaching = true;
+      }
+    }
+    if (!foundCaching) {
+      cfg.modResults.properties.push({ key: 'org.gradle.caching', value: 'true' });
+    }
+    
     console.log('[DroidVibe] withKotlinVersion plugin applied - gradle.properties patched');
     return cfg;
   });
 }
 
 function withBuildConfigEnabled(config) {
-  if (!withAppBuildGradle) {
-    console.warn('[DroidVibe] withAppBuildGradle not available - skipping BuildConfig + namespace patch');
-    return config;
-  }
   return withAppBuildGradle(config, (cfg) => {
     let contents = cfg.modResults.contents;
     let modified = false;
+    
+    // Fix namespace to match app.json
     if (!/namespaces+"com.droidvibe.app"/.test(contents)) {
       if (/namespaces+"[^"]*"/.test(contents)) {
         contents = contents.replace(/namespaces+"[^"]*"/, 'namespace "com.droidvibe.app"');
         console.log('[DroidVibe] Fixed namespace to com.droidvibe.app in app/build.gradle');
         modified = true;
-      } else if (/androids*{/.test(contents)) {
-        contents = contents.replace(/(androids*{)/, '$1
-    namespace "com.droidvibe.app"');
-        console.log('[DroidVibe] Added namespace com.droidvibe.app to app/build.gradle');
-        modified = true;
       }
     }
+    
+    // Ensure buildConfig is enabled
     if (!/buildConfigs*=s*true/.test(contents)) {
-      if (/buildConfigs*=s*false/.test(contents)) {
-        contents = contents.replace(/buildConfigs*=s*false/g, 'buildConfig = true');
-        console.log('[DroidVibe] Replaced buildConfig = false -> true in app/build.gradle');
-        modified = true;
-      } else if (/buildFeaturess{/.test(contents)) {
-        contents = contents.replace(/(buildFeaturess{)/, '$1
+      if (/buildFeaturess*{/.test(contents)) {
+        if (!/buildConfigs*=s*true/.test(contents)) {
+          contents = contents.replace(/(buildFeaturess*{)/, '$1
         buildConfig = true');
-        console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
-        modified = true;
-      } else if (/androids{/.test(contents)) {
-        contents = contents.replace(/(androids{)/, '$1
+          console.log('[DroidVibe] Added buildConfig = true to existing buildFeatures block');
+          modified = true;
+        }
+      } else if (/androids*{/.test(contents)) {
+        contents = contents.replace(/(androids*{)/, '$1
     buildFeatures {
         buildConfig = true
     }');
         console.log('[DroidVibe] Added buildFeatures block with buildConfig = true');
         modified = true;
       }
-    } else {
-      console.log('[DroidVibe] buildConfig = true already present in app/build.gradle');
     }
+    
+    // Set Java compatibility to 17
+    if (!/sourceCompatibilitys+JavaVersion.VERSION_17/.test(contents)) {
+      if (/compileOptionss*{/.test(contents)) {
+        contents = contents.replace(/compileOptionss*{/, 'compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17');
+        console.log('[DroidVibe] Added Java 17 compatibility to compileOptions');
+        modified = true;
+      }
+    }
+    
+    // Set Kotlin JVM target to 17
+    if (!/jvmTargets*=s*['"]17['"]/.test(contents)) {
+      if (/kotlinOptionss*{/.test(contents)) {
+        contents = contents.replace(/kotlinOptionss*{/, 'kotlinOptions {
+        jvmTarget = '17'');
+        console.log('[DroidVibe] Added jvmTarget = 17 to kotlinOptions');
+        modified = true;
+      }
+    }
+    
+    // Suppress Kotlin version compatibility check for Compose
+    if (!/suppressKotlinVersionCompatibilityCheck/.test(contents)) {
+      if (/kotlinOptionss*{/.test(contents)) {
+        contents = contents.replace(/kotlinOptionss*{/, 'kotlinOptions {
+        freeCompilerArgs += ['-P', 'plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true']');
+        console.log('[DroidVibe] Added suppressKotlinVersionCompatibilityCheck for Compose');
+        modified = true;
+      }
+    }
+    
     if (modified) {
       cfg.modResults.contents = contents;
     }
@@ -173,6 +170,10 @@ module.exports = {
       features: [
         { name: 'android.hardware.usb.host', required: false },
       ],
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#00979D'
+      }
     },
     plugins: [withKotlinVersion, withBuildConfigEnabled],
     experiments: {
