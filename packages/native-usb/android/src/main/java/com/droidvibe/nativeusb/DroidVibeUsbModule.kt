@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 // ---- Record input types (mirror the shared TypeScript types) ----
 
-class SerialOptionsInput : Record() {
+class SerialOptionsInput : Record {
     @Field val baudRate: Int = 115200
     @Field val dataBits: Int = 8
     @Field val stopBits: Int = 1
@@ -27,7 +27,7 @@ class SerialOptionsInput : Record() {
     @Field val rts: Boolean = false
 }
 
-class UploadRequestInput : Record() {
+class UploadRequestInput : Record {
     @Field val deviceId: String = ""
     @Field val vendorId: String = ""
     @Field val productId: String = ""
@@ -38,7 +38,7 @@ class UploadRequestInput : Record() {
     @Field val verify: Boolean = true
 }
 
-class CaptureConfigInput : Record() {
+class CaptureConfigInput : Record {
     @Field val deviceId: String = ""
     @Field val sampleRate: Int = 1_000_000
     @Field val numSamples: Int = 8192
@@ -48,13 +48,13 @@ class CaptureConfigInput : Record() {
     @Field val triggerEdge: String = "rising"
 }
 
-class HelperFirmwareInput : Record() {
+class HelperFirmwareInput : Record {
     @Field val deviceId: String = ""
     @Field val uf2Base64: String = ""
     @Field val verify: Boolean = true
 }
 
-class SwdTransferInput : Record() {
+class SwdTransferInput : Record {
     @Field val deviceId: String = ""
     @Field val isRead: Boolean = true
     @Field val apDp: Int = 0
@@ -62,7 +62,7 @@ class SwdTransferInput : Record() {
     @Field val data: Int = 0
 }
 
-class JtagTransferInput : Record() {
+class JtagTransferInput : Record {
     @Field val deviceId: String = ""
     @Field val tmsBase64: String = ""
     @Field val tdiBase64: String = ""
