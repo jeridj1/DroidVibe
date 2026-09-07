@@ -38,7 +38,8 @@ static void capture_samples(uint samples) {
         configured_offset = pio_add_program(capture_pio, &odt_capture_program);
     }
 
-    float div = (float)clock_get_hz(clk_sys) / (float)configured_rate;
+    // The PIO capture loop consumes two instructions per sample.
+    float div = (float)clock_get_hz(clk_sys) / (2.0f * (float)configured_rate);
     if (div < 1.0f) div = 1.0f;
     odt_capture_program_init(capture_pio, capture_sm, (uint)configured_offset,
                              CAPTURE_BASE_PIN, div);
