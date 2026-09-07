@@ -11,7 +11,7 @@
 #define MAX_SAMPLES 8192
 #define MAX_WORDS ((MAX_SAMPLES + 3) / 4)
 
-extern const struct pio_program odt_capture_program;
+extern uint odt_capture_program_add(PIO pio);
 extern uint odt_capture_program_init(PIO pio, uint sm, uint offset, uint pin, float clkdiv);
 
 static uint32_t capture_words[MAX_WORDS];
@@ -35,10 +35,9 @@ static void capture_samples(uint samples) {
     if (channels == 0 || channels > CAPTURE_CHANNELS) channels = CAPTURE_CHANNELS;
 
     if (configured_offset < 0) {
-        configured_offset = pio_add_program(capture_pio, &odt_capture_program);
+        configured_offset = (int)odt_capture_program_add(capture_pio);
     }
 
-    // The PIO capture loop consumes two instructions per sample.
     float div = (float)clock_get_hz(clk_sys) / (2.0f * (float)configured_rate);
     if (div < 1.0f) div = 1.0f;
     odt_capture_program_init(capture_pio, capture_sm, (uint)configured_offset,
