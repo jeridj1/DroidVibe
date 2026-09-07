@@ -23,30 +23,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+        with: { version: 9.12.0 }
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: { node-version: 22 }
       - run: pnpm install --no-frozen-lockfile
       - name: Typecheck
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
         run: |
           set +e
           pnpm typecheck > /tmp/tsc-output.txt 2>&1
-          tsc_exit=$?
+          code=$?
           cat /tmp/tsc-output.txt
-          if [ $tsc_exit -ne 0 ]; then
-            echo "## Full Typecheck Output" >> $GITHUB_STEP_SUMMARY
-            echo '~~~' >> $GITHUB_STEP_SUMMARY
-            cat /tmp/tsc-output.txt >> $GITHUB_STEP_SUMMARY
-            echo '~~~' >> $GITHUB_STEP_SUMMARY
+          if [ $code -ne 0 ]; then
             {
               echo "## Full Typecheck Output"
               echo ""
               echo "Commit: ${{ github.sha }}"
-              echo ""
               echo '~~~'
               cat /tmp/tsc-output.txt
               echo '~~~'
@@ -54,9 +46,8 @@ jobs:
             gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
             exit 1
           fi
-      - name: Upload typecheck output
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: tsc-output
           path: /tmp/tsc-output.txt
@@ -71,12 +62,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+        with: { version: 9.12.0 }
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
+        with: { node-version: 22 }
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @droidvibe/web build
       - uses: actions/upload-artifact@v4
@@ -92,11 +80,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+        with: { version: 9.12.0 }
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: { node-version: 22 }
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
 
@@ -105,16 +91,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: quality
-    env:
-      EXPO_NO_TELEMETRY: "1"
+    env: { EXPO_NO_TELEMETRY: "1" }
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+        with: { version: 9.12.0 }
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: { node-version: 22 }
       - run: pnpm install --no-frozen-lockfile
       - name: Generate PNG assets from SVG sources
         run: |
@@ -122,19 +105,16 @@ jobs:
           NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
       - name: Expo prebuild
         working-directory: apps/mobile
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
         run: |
           set +e
           pnpm exec expo prebuild --platform android --no-install --clean > /tmp/prebuild-output.txt 2>&1
-          prebuild_exit=$?
+          code=$?
           cat /tmp/prebuild-output.txt
-          if [ $prebuild_exit -ne 0 ]; then
+          if [ $code -ne 0 ]; then
             {
               echo "## Expo Prebuild Failure"
-              echo ""
               echo "Commit: ${{ github.sha }}"
-              echo ""
               echo '~~~'
               cat /tmp/prebuild-output.txt
               echo '~~~'
@@ -146,7 +126,7 @@ jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     needs: mobile-prebuild
     env:
       EXPO_NO_TELEMETRY: "1"
@@ -154,11 +134,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+        with: { version: 9.12.0 }
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: { node-version: 22 }
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -176,6 +154,27 @@ jobs:
         run: |
           npm install --prefix /tmp/asset-tools sharp
           NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
+      - name: Build RP2040 logic analyzer helper
+        env:
+          PICO_SDK_VERSION: 2.1.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi cmake ninja-build
+          rm -rf /tmp/pico-sdk /tmp/rp2040-build
+          git clone --depth 1 --branch "${PICO_SDK_VERSION}" --recurse-submodules https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+          cp /tmp/pico-sdk/external/pico_sdk_import.cmake firmware/rp2040-logic-analyzer/pico_sdk_import.cmake
+          cmake -S firmware/rp2040-logic-analyzer -B /tmp/rp2040-build -G Ninja
+          cmake --build /tmp/rp2040-build --parallel 2
+          test -s /tmp/rp2040-build/droidvibe_rp2040_logic_analyzer.uf2
+          mkdir -p apps/mobile/src/lib/generated
+          {
+            echo '/** Generated by CI from firmware/rp2040-logic-analyzer. */'
+            echo 'export const RP2040_LOGIC_ANALYZER_UF2_BASE64 = '
+            printf "'"
+            base64 -w0 /tmp/rp2040-build/droidvibe_rp2040_logic_analyzer.uf2
+            echo "';"
+          } > apps/mobile/src/lib/generated/rp2040LogicAnalyzerFirmware.ts
+          wc -c /tmp/rp2040-build/droidvibe_rp2040_logic_analyzer.uf2 apps/mobile/src/lib/generated/rp2040LogicAnalyzerFirmware.ts
       - name: Expo prebuild
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
@@ -187,90 +186,46 @@ jobs:
         working-directory: apps/mobile/android
         run: |
           if [ -f gradle.properties ]; then
-            if grep -q 'android.kotlinVersion=' gradle.properties; then
-              sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties
-            else
-              echo "android.kotlinVersion=1.9.25" >> gradle.properties
-            fi
+            if grep -q 'android.kotlinVersion=' gradle.properties; then sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties; else echo 'android.kotlinVersion=1.9.25' >> gradle.properties; fi
           else
-            echo "android.kotlinVersion=1.9.25" > gradle.properties
+            echo 'android.kotlinVersion=1.9.25' > gradle.properties
           fi
-          if ! grep -q 'kotlin.jvm.target.validation.mode' gradle.properties; then
-            echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
-          fi
-          if ! grep -q 'org.gradle.jvmargs' gradle.properties; then
-            echo "org.gradle.jvmargs=-Xmx3g" >> gradle.properties
-          fi
-          if ! grep -q 'org.gradle.parallel' gradle.properties; then
-            echo "org.gradle.parallel=true" >> gradle.properties
-          fi
-          if ! grep -q 'org.gradle.caching' gradle.properties; then
-            echo "org.gradle.caching=true" >> gradle.properties
-          fi
-          if [ -f build.gradle ]; then
-            sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
-          fi
+          grep -q 'kotlin.jvm.target.validation.mode' gradle.properties || echo 'kotlin.jvm.target.validation.mode=warning' >> gradle.properties
+          grep -q 'org.gradle.jvmargs' gradle.properties || echo 'org.gradle.jvmargs=-Xmx3g' >> gradle.properties
+          grep -q 'org.gradle.parallel' gradle.properties || echo 'org.gradle.parallel=true' >> gradle.properties
+          grep -q 'org.gradle.caching' gradle.properties || echo 'org.gradle.caching=true' >> gradle.properties
+          [ -f build.gradle ] && sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
           if [ -f app/build.gradle ]; then
             if ! grep -q 'buildConfig = true' app/build.gradle; then
-              if grep -q 'buildConfig = false' app/build.gradle; then
-                sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
-              elif grep -q 'buildFeatures {' app/build.gradle; then
-                sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
-              elif grep -q 'android {' app/build.gradle; then
-                sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
-              fi
+              if grep -q 'buildConfig = false' app/build.gradle; then sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
+              elif grep -q 'buildFeatures {' app/build.gradle; then sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
+              elif grep -q 'android {' app/build.gradle; then sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle; fi
             fi
             if ! grep -q 'namespace "com.droidvibe.app"' app/build.gradle; then
-              if grep -q 'namespace "' app/build.gradle; then
-                sed -i 's/namespace "[^"]*"/namespace "com.droidvibe.app"/' app/build.gradle
-              elif grep -q 'android {' app/build.gradle; then
-                sed -i '/android {/a\    namespace "com.droidvibe.app"' app/build.gradle
-              fi
+              if grep -q 'namespace "' app/build.gradle; then sed -i 's/namespace "[^"]*"/namespace "com.droidvibe.app"/' app/build.gradle
+              elif grep -q 'android {' app/build.gradle; then sed -i '/android {/a\    namespace "com.droidvibe.app"' app/build.gradle; fi
             fi
           fi
-          echo "=== Final gradle.properties ==="
-          cat gradle.properties
       - name: Bundle JavaScript
         working-directory: apps/mobile
         run: |
-          # Install react-native CLI (not included by default in Expo projects)
           pnpm add -D @react-native-community/cli@latest 2>&1 | tee /tmp/bundle-output.txt
-          
-          # Create a temporary entry file inside apps/mobile/ (under Metro's projectRoot)
-          # so Metro can watch it and compute its SHA-1.
           echo "import 'expo-router/entry';" > index.js
-          ENTRY_FILE="$(pwd)/index.js"
-          echo "Entry file: $ENTRY_FILE" 2>&1 | tee -a /tmp/bundle-output.txt
-          
-          # Create assets directory for the JS bundle
           mkdir -p android/app/src/main/assets
-          
-          # Bundle the JS using Metro (via react-native CLI)
-          echo "=== Running react-native bundle ===" 2>&1 | tee -a /tmp/bundle-output.txt
           pnpm exec react-native bundle \
             --platform android \
             --dev false \
-            --entry-file "$ENTRY_FILE" \
+            --entry-file "$(pwd)/index.js" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res/ \
             --max-workers 2 \
             --verbose 2>&1 | tee -a /tmp/bundle-output.txt
-          bundle_exit=${PIPESTATUS[0]}
-          
-          # Clean up temporary entry file
+          code=${PIPESTATUS[0]}
           rm -f index.js
-          
-          if [ $bundle_exit -ne 0 ]; then
-            echo "=== react-native bundle failed (exit $bundle_exit) ===" 2>&1 | tee -a /tmp/bundle-output.txt
-            exit 1
-          fi
-          
-          echo "=== JS bundle created ===" 2>&1 | tee -a /tmp/bundle-output.txt
-          ls -la android/app/src/main/assets/index.android.bundle
+          [ $code -eq 0 ] || exit $code
       - name: Build debug APK
         working-directory: apps/mobile/android
-        run: |
-          ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace 2>&1 | tee /tmp/build-output.txt
+        run: ./gradlew assembleDebug --no-daemon --parallel --build-cache --stacktrace 2>&1 | tee /tmp/build-output.txt
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
@@ -280,24 +235,19 @@ jobs:
           retention-days: 30
       - name: Report build error
         if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
         run: |
           {
             echo "## Android APK Build Failure"
-            echo ""
             echo "Commit: ${{ github.sha }}"
-            echo ""
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo ""
-            echo "### Bundle Output"
+            echo '### Bundle Output'
             echo '~~~'
-            cat /tmp/bundle-output.txt 2>/dev/null || echo "No bundle output captured"
+            cat /tmp/bundle-output.txt 2>/dev/null || true
             echo '~~~'
-            echo ""
-            echo "### Build Output (last 100 lines)"
+            echo '### Build Output (last 100 lines)'
             echo '~~~'
-            tail -100 /tmp/build-output.txt 2>/dev/null || echo "No build output captured"
+            tail -100 /tmp/build-output.txt 2>/dev/null || true
             echo '~~~'
           } > /tmp/apk-issue.md
           gh issue create --title "CI: Android APK build failure (${{ github.sha }})" --body-file /tmp/apk-issue.md || true
