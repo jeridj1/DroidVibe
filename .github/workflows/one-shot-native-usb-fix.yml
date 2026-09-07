@@ -27,7 +27,7 @@ jobs:
           PY
       - name: Verify exact change
         run: |
-          test "$(grep -c ': Record$' 'packages/native-usb/android/src/main/java/com/droidvibe/nativeusb/DroidVibeUsbModule.kt')" -eq 6
+          test "$(grep -c ': Record {' 'packages/native-usb/android/src/main/java/com/droidvibe/nativeusb/DroidVibeUsbModule.kt')" -eq 6
           test "$(grep -c ': Record()' 'packages/native-usb/android/src/main/java/com/droidvibe/nativeusb/DroidVibeUsbModule.kt' || true)" -eq 0
       - name: Commit repair
         run: |
