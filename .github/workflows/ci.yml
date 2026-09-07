@@ -177,7 +177,7 @@ jobs:
           rm -rf /tmp/pico-sdk /tmp/rp2040-build
           git clone --depth 1 --branch "${PICO_SDK_VERSION}" --recurse-submodules https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
           cp /tmp/pico-sdk/external/pico_sdk_import.cmake firmware/rp2040-logic-analyzer/pico_sdk_import.cmake
-          cmake -S firmware/rp2040-logic-analyzer -B /tmp/rp2040-build -G Ninja
+          PICO_SDK_PATH=/tmp/pico-sdk cmake -S firmware/rp2040-logic-analyzer -B /tmp/rp2040-build -G Ninja
           cmake --build /tmp/rp2040-build --parallel 2
           test -s /tmp/rp2040-build/droidvibe_rp2040_logic_analyzer.uf2
           mkdir -p apps/mobile/src/lib/generated
