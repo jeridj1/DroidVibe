@@ -216,7 +216,7 @@ export default function BenchScreen() {
         <View style={{ paddingHorizontal: 16 }}>
           <SectionTitle title="Serial Plotter" subtitle="Live numeric graphs" />
           <Card>
-            <WaveformViewer mode="plot" palette={palette} dataSource={connectedDevice ? 'serial' : 'demo'} />
+            <WaveformViewer mode="plotter" palette={palette} dataSource={connectedDevice ? 'serial' : 'demo'} />
             <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 8 }}>
               {connectedDevice
                 ? 'Streaming from connected device'
