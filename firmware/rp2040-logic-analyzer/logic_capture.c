@@ -1,6 +1,10 @@
 #include "hardware/pio.h"
 #include "logic_capture.pio.h"
 
+uint odt_capture_program_add(PIO pio) {
+    return pio_add_program(pio, &odt_capture_program);
+}
+
 uint odt_capture_program_init(PIO pio, uint sm, uint offset, uint pin, float clkdiv) {
     pio_sm_config c = odt_capture_program_get_default_config(offset);
     sm_config_set_in_pins(&c, pin);
