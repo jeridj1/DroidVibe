@@ -1,4 +1,7 @@
 {
   "platforms": ["android"],
+  "android": {
+    "modules": ["com.droidvibe.nativeusb.DroidVibeUsbModule"]
+  },
   "app": ["android/src/main/AndroidManifest.xml"]
 }
