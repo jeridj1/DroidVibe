@@ -5,6 +5,7 @@
  * only available in a custom Expo dev/production build; under Expo Go it falls
  * back to the mock transport exported from the mobile app's transport layer.
  */
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import type {
   SerialOptions,
   UploadRequest,
@@ -83,34 +84,19 @@ function mapUploadRequest(req: UploadRequest) {
 
 export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
   try {
-    let raw: RawNativeModule | null = null;
-
-    const NativeModules =
-      (globalThis as any).nativeModulesProxy ?? (globalThis as any).NativeModules;
-    const mod = NativeModules?.DroidVibeUsb;
-    if (mod) raw = mod as RawNativeModule;
-
-    if (!raw) {
-      const req = (globalThis as any).require;
-      if (typeof req === 'function') {
-        const modules = req('expo-modules-core');
-        const m = modules?.NativeModulesProxy?.DroidVibeUsb;
-        if (m) raw = m as RawNativeModule;
-      }
-    }
-
+    const raw = requireOptionalNativeModule<RawNativeModule>('DroidVibeUsb');
     if (!raw) return null;
 
     const wrapped: DroidVibeUsbModuleType = {
-      listDevices: () => raw!.listDevices(),
-      hasDevicePermission: (id) => raw!.hasDevicePermission(id),
-      requestPermission: (id) => raw!.requestPermission(id),
-      openSerial: (id, opts) => raw!.openSerial(id, opts),
-      writeSerial: (id, data) => raw!.writeSerial(id, data),
-      closeSerial: (id) => raw!.closeSerial(id),
+      listDevices: () => raw.listDevices(),
+      hasDevicePermission: (id) => raw.hasDevicePermission(id),
+      requestPermission: (id) => raw.requestPermission(id),
+      openSerial: (id, opts) => raw.openSerial(id, opts),
+      writeSerial: (id, data) => raw.writeSerial(id, data),
+      closeSerial: (id) => raw.closeSerial(id),
 
       addSerialDataListener: (deviceId, cb) => {
-        const sub = raw!.addListener('onUsbData', (payload: { deviceId?: string; data?: number[] }) => {
+        const sub = raw.addListener('onUsbData', (payload: { deviceId?: string; data?: number[] }) => {
           if (payload?.deviceId === deviceId && payload.data) {
             cb(new Uint8Array(payload.data));
           }
@@ -119,7 +105,7 @@ export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
       },
 
       addDeviceListener: (cb) => {
-        const sub = raw!.addListener('onDeviceEvent', (payload: { type: 'attach' | 'detach'; device: UsbDevice }) => {
+        const sub = raw.addListener('onDeviceEvent', (payload: { type: 'attach' | 'detach'; device: UsbDevice }) => {
           cb(payload);
         });
         return () => sub.remove();
@@ -128,25 +114,25 @@ export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
       upload: (request, onProgress) => {
         let progressSub: { remove(): void } | null = null;
         if (onProgress) {
-          progressSub = raw!.addListener('onUploadProgress', (payload: UploadProgress) => {
+          progressSub = raw.addListener('onUploadProgress', (payload: UploadProgress) => {
             onProgress(payload);
           });
         }
-        return raw!.upload(mapUploadRequest(request)).finally(() => {
+        return raw.upload(mapUploadRequest(request)).finally(() => {
           progressSub?.remove();
         });
       },
 
-      capture: (config) => raw!.capture(config),
-      flashUf2: (deviceId, uf2Base64, verify) => raw!.flashUf2(deviceId, uf2Base64, verify),
+      capture: (config) => raw.capture(config),
+      flashUf2: (deviceId, uf2Base64, verify) => raw.flashUf2(deviceId, uf2Base64, verify),
 
       // RP2040 multi-mode
-      flashHelperFirmware: (request) => raw!.flashHelperFirmware(request),
-      enterBootselViaSerial: (deviceId) => raw!.enterBootselViaSerial(deviceId),
-      swdTransfer: (request) => raw!.swdTransfer(request),
-      jtagTransfer: (request) => raw!.jtagTransfer(request),
-      isRp2040Bootsel: (deviceId) => raw!.isRp2040Bootsel(deviceId),
-      getRp2040Mode: (deviceId) => raw!.getRp2040Mode(deviceId),
+      flashHelperFirmware: (request) => raw.flashHelperFirmware(request),
+      enterBootselViaSerial: (deviceId) => raw.enterBootselViaSerial(deviceId),
+      swdTransfer: (request) => raw.swdTransfer(request),
+      jtagTransfer: (request) => raw.jtagTransfer(request),
+      isRp2040Bootsel: (deviceId) => raw.isRp2040Bootsel(deviceId),
+      getRp2040Mode: (deviceId) => raw.getRp2040Mode(deviceId),
     };
 
     return wrapped;
