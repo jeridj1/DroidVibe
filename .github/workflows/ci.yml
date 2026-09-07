@@ -23,12 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9.12.0 }
+        with:
+          version: 9.12.0
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - name: Typecheck
-        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           pnpm typecheck > /tmp/tsc-output.txt 2>&1
@@ -46,8 +49,9 @@ jobs:
             gh issue create --title "CI: Typecheck failure (${{ github.sha }})" --body-file /tmp/tc-issue.md || true
             exit 1
           fi
-      - uses: actions/upload-artifact@v4
+      - name: Upload typecheck output
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: tsc-output
           path: /tmp/tsc-output.txt
@@ -62,9 +66,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9.12.0 }
+        with:
+          version: 9.12.0
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @droidvibe/web build
       - uses: actions/upload-artifact@v4
@@ -80,9 +86,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9.12.0 }
+        with:
+          version: 9.12.0
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
 
@@ -91,13 +99,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: quality
-    env: { EXPO_NO_TELEMETRY: "1" }
+    env:
+      EXPO_NO_TELEMETRY: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9.12.0 }
+        with:
+          version: 9.12.0
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - name: Generate PNG assets from SVG sources
         run: |
@@ -105,7 +116,8 @@ jobs:
           NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
       - name: Expo prebuild
         working-directory: apps/mobile
-        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           pnpm exec expo prebuild --platform android --no-install --clean > /tmp/prebuild-output.txt 2>&1
@@ -134,9 +146,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9.12.0 }
+        with:
+          version: 9.12.0
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -186,7 +200,11 @@ jobs:
         working-directory: apps/mobile/android
         run: |
           if [ -f gradle.properties ]; then
-            if grep -q 'android.kotlinVersion=' gradle.properties; then sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties; else echo 'android.kotlinVersion=1.9.25' >> gradle.properties; fi
+            if grep -q 'android.kotlinVersion=' gradle.properties; then
+              sed -i 's/android.kotlinVersion=.*/android.kotlinVersion=1.9.25/' gradle.properties
+            else
+              echo 'android.kotlinVersion=1.9.25' >> gradle.properties
+            fi
           else
             echo 'android.kotlinVersion=1.9.25' > gradle.properties
           fi
@@ -194,16 +212,25 @@ jobs:
           grep -q 'org.gradle.jvmargs' gradle.properties || echo 'org.gradle.jvmargs=-Xmx3g' >> gradle.properties
           grep -q 'org.gradle.parallel' gradle.properties || echo 'org.gradle.parallel=true' >> gradle.properties
           grep -q 'org.gradle.caching' gradle.properties || echo 'org.gradle.caching=true' >> gradle.properties
-          [ -f build.gradle ] && sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
+          if [ -f build.gradle ]; then
+            sed -i 's/ndkVersion = .*/ndkVersion = "27.3.13750724"/' build.gradle
+          fi
           if [ -f app/build.gradle ]; then
             if ! grep -q 'buildConfig = true' app/build.gradle; then
-              if grep -q 'buildConfig = false' app/build.gradle; then sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
-              elif grep -q 'buildFeatures {' app/build.gradle; then sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
-              elif grep -q 'android {' app/build.gradle; then sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle; fi
+              if grep -q 'buildConfig = false' app/build.gradle; then
+                sed -i 's/buildConfig = false/buildConfig = true/g' app/build.gradle
+              elif grep -q 'buildFeatures {' app/build.gradle; then
+                sed -i '/buildFeatures {/a\        buildConfig = true' app/build.gradle
+              elif grep -q 'android {' app/build.gradle; then
+                sed -i '/android {/a\    buildFeatures {\n        buildConfig = true\n    }' app/build.gradle
+              fi
             fi
             if ! grep -q 'namespace "com.droidvibe.app"' app/build.gradle; then
-              if grep -q 'namespace "' app/build.gradle; then sed -i 's/namespace "[^"]*"/namespace "com.droidvibe.app"/' app/build.gradle
-              elif grep -q 'android {' app/build.gradle; then sed -i '/android {/a\    namespace "com.droidvibe.app"' app/build.gradle; fi
+              if grep -q 'namespace "' app/build.gradle; then
+                sed -i 's/namespace "[^"]*"/namespace "com.droidvibe.app"/' app/build.gradle
+              elif grep -q 'android {' app/build.gradle; then
+                sed -i '/android {/a\    namespace "com.droidvibe.app"' app/build.gradle
+              fi
             fi
           fi
       - name: Bundle JavaScript
@@ -235,7 +262,8 @@ jobs:
           retention-days: 30
       - name: Report build error
         if: failure()
-        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
             echo "## Android APK Build Failure"
