@@ -1,14 +1,12 @@
 /**
- * Typed RPC client for the DroidVibe backend. Calls POST /rpc/<ns>/<proc>.
- * Falls back to a clear offline error when the backend is unreachable.
- *
- * AI features (explainError, generate, fix) work WITHOUT a backend when
- * the user provides an API key in Settings — calls go directly to the AI
- * provider from the phone via direct-ai.ts.
+ * DroidVibe application API.
+ * Hardware compilation is local-first: the Android APK contains the
+ * compiler/toolchains and does not require a backend to build a sketch.
  */
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { directAi } from './direct-ai';
+import { getNativeUsbModule } from '@droidvibe/native-usb';
 
 const DEFAULT_BASE =
   ((Constants.expoConfig?.extra?.DROIDVIBE_API_URL as string | undefined) ||
@@ -36,35 +34,38 @@ export async function invalidateApiBaseCache(): Promise<void> {
 }
 
 async function rpc<T>(path: string, input: unknown): Promise<T> {
-  try {
-    const base = await ensureApiBase();
-    const res = await fetch(base + '/rpc/' + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: input ? JSON.stringify(input) : '{}',
-    });
-    const json = (await res.json()) as { ok: boolean; data?: T; error?: string };
-    if (!json.ok) throw new Error(json.error ?? 'RPC error');
-    return json.data as T;
-  } catch (e) {
-    throw new Error('Backend unreachable: ' + (e as Error).message);
+  const base = await ensureApiBase();
+  const res = await fetch(base + '/rpc/' + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: input ? JSON.stringify(input) : '{}',
+  });
+  const json = (await res.json()) as { ok: boolean; data?: T; error?: string };
+  if (!json.ok) throw new Error(json.error ?? 'RPC error');
+  return json.data as T;
+}
+
+async function compileLocalOrExplain(input: {
+  name: string;
+  fqbn: string;
+  files: Array<{ path: string; content: string }>;
+}) {
+  const native = getNativeUsbModule();
+  if (!native) {
+    throw new Error('Local compiler unavailable. Install the DroidVibe APK with the bundled Android toolchain; Expo Go cannot execute it.');
   }
+  const main = input.files.find(f => /\.ino$/i.test(f.path)) ?? input.files[0];
+  if (!main) throw new Error('Sketch contains no source files.');
+  return native.compileLocal({ name: input.name, fqbn: input.fqbn, code: main.content });
 }
 
 export const api = {
-  compile: (input: {
+  compile: async (input: {
     name: string;
     fqbn: string;
     files: Array<{ path: string; content: string }>;
-  }) =>
-    rpc<{
-      ok: boolean;
-      diagnostics: unknown[];
-      firmware?: string;
-      firmwarePath?: string;
-      durationMs: number;
-      stdout: string;
-    }>('compile', input),
+  }) => compileLocalOrExplain(input),
+  compileRemote: (input: unknown) => rpc('compile', input),
   diagnostics: { explain: (input: unknown) => rpc('diagnostics/explain', input) },
   boards: { list: (input: { query?: string }) => rpc('boards/list', input) },
   libraries: { list: (input: { query?: string }) => rpc('libraries/list', input) },
