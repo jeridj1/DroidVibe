@@ -32,7 +32,12 @@ object LocalToolchain {
         val stdout: String,
     )
 
-    fun compile(context: Context, name: String, fqbn: String, source: String): CompileResult {
+    fun compile(
+        context: Context,
+        name: String,
+        fqbn: String,
+        files: List<Pair<String, String>>,
+    ): CompileResult {
         val started = System.currentTimeMillis()
         val root = ensureInstalled(context)
         val safeName = name.replace(Regex("[^A-Za-z0-9_]+"), "_").ifBlank { "Sketch" }
@@ -41,9 +46,15 @@ object LocalToolchain {
         val buildDir = File(job, "build")
         sketchDir.mkdirs()
         buildDir.mkdirs()
-        File(sketchDir, "$safeName.ino").writeText(source, Charsets.UTF_8)
-        File(job, "user").mkdirs()
-        File(job, "cache").mkdirs()
+        if (files.isEmpty()) throw IllegalArgumentException("Sketch contains no source files")
+        for ((relativePath, content) in files) {
+            val clean = relativePath.replace('\\', '/').removePrefix("/")
+            if (clean.isBlank() || clean.split('/').any { it == ".." }) throw SecurityException("Invalid sketch path")
+            val dest = File(sketchDir, clean)
+            if (!dest.canonicalPath.startsWith(sketchDir.canonicalPath + File.separator)) throw SecurityException("Sketch path escaped workspace")
+            dest.parentFile?.mkdirs()
+            dest.writeText(content, Charsets.UTF_8)
+        }
 
         val command = listOf(
             root.proot.absolutePath,
@@ -76,7 +87,7 @@ object LocalToolchain {
         val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (!process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
             process.destroyForcibly()
-            return CompileResult(false, listOf(diag("error", "$safeName.ino", 0, 0, "Local compilation timed out after $TIMEOUT_MINUTES minutes")), null, null, fqbn, System.currentTimeMillis() - started, output)
+            return CompileResult(false, listOf(diag("error", safeName + ".ino", 0, 0, "Local compilation timed out after $TIMEOUT_MINUTES minutes")), null, null, fqbn, System.currentTimeMillis() - started, output)
         }
 
         val firmwareFile = findFirmware(buildDir, fqbn)
@@ -122,7 +133,7 @@ object LocalToolchain {
                             current.isSymbolicLink -> {
                                 out.parentFile?.mkdirs()
                                 val target = current.linkName
-                                if (target.isBlank() || target.split('/').any { it == ".." }) throw SecurityException("Invalid toolchain symlink")
+                                if (target.isBlank()) throw SecurityException("Invalid toolchain symlink")
                                 runCatching { Files.deleteIfExists(out.toPath()) }
                                 Files.createSymbolicLink(out.toPath(), File(target).toPath())
                             }
@@ -137,7 +148,8 @@ object LocalToolchain {
                             else -> {
                                 out.parentFile?.mkdirs()
                                 FileOutputStream(out).use { fos -> tar.copyTo(fos) }
-                                out.setExecutable((current.mode and 0b00100) != 0 || (current.mode and 0b00010) != 0, false)
+                                val executable = (current.mode and 0b1000000) != 0 || (current.mode and 0b1000) != 0 || (current.mode and 0b1) != 0
+                                out.setExecutable(executable, false)
                                 out.setReadable(true, false)
                             }
                         }
@@ -162,9 +174,7 @@ object LocalToolchain {
             fqbn.startsWith("esp32:") -> listOf(".bin", ".hex", ".uf2")
             else -> listOf(".hex", ".bin", ".uf2")
         }
-        return preferred.asSequence()
-            .flatMap { ext -> files.filter { it.extension.equals(ext.removePrefix("."), true) }.asSequence() }
-            .maxByOrNull { it.length() }
+        return preferred.asSequence().flatMap { ext -> files.filter { it.extension.equals(ext.removePrefix("."), true) }.asSequence() }.maxByOrNull { it.length() }
     }
 
     private fun parseDiagnostics(output: String, defaultFile: String): List<Map<String, Any?>> {
@@ -181,17 +191,10 @@ object LocalToolchain {
     }
 
     private fun diag(severity: String, file: String, line: Int, column: Int, message: String): Map<String, Any?> = mapOf(
-        "severity" to severity,
-        "file" to file,
-        "line" to line,
-        "column" to column,
-        "message" to message,
+        "severity" to severity, "file" to file, "line" to line, "column" to column, "message" to message,
     )
 
     private fun cleanupAsync(job: File) {
-        Thread {
-            try { Thread.sleep(5000); job.deleteRecursively() }
-            catch (_: Exception) { Log.w(TAG, "Could not clean local compiler job ${job.absolutePath}") }
-        }.start()
+        Thread { try { Thread.sleep(5000); job.deleteRecursively() } catch (_: Exception) { Log.w(TAG, "Could not clean local compiler job ${job.absolutePath}") } }.start()
     }
 }
