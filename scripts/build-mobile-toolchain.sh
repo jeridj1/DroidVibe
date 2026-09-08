@@ -17,7 +17,7 @@ cid="$(docker create --platform linux/arm64 debian:bookworm-slim)"
 docker export "$cid" | tar -xpf - -C "$ROOTFS"
 docker rm "$cid" >/dev/null
 
-rm -rf "$ROOTFS/var/cache/apt" "$ROOTFS/usr/share/doc" "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/locale" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/run" "$ROOTFS/tmp"/*
+rm -rf "$ROOTFS/var/cache/apt" "$ROOTFS/usr/share/doc" "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/locale" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/run" "$ROOTFS/tmp"/*
 mkdir -p "$ROOTFS/tmp" "$ROOTFS/work"
 
 curl -fsSL "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_ARM64.tar.gz" \
@@ -33,7 +33,12 @@ docker run --platform linux/arm64 --rm \
     apt-get update >/dev/null
     apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 >/dev/null
     rm -f /mnt/rootfs/etc/resolv.conf
-    cp -L /etc/resolv.conf /mnt/rootfs/etc/resolv.conf
+    cp /etc/resolv.conf /mnt/rootfs/etc/resolv.conf
+    mkdir -p /mnt/rootfs/dev /mnt/rootfs/dev/pts /mnt/rootfs/run
+    [ -e /mnt/rootfs/dev/null ] || mknod -m 666 /mnt/rootfs/dev/null c 1 3
+    [ -e /mnt/rootfs/dev/zero ] || mknod -m 666 /mnt/rootfs/dev/zero c 1 5
+    [ -e /mnt/rootfs/dev/random ] || mknod -m 666 /mnt/rootfs/dev/random c 1 8
+    [ -e /mnt/rootfs/dev/urandom ] || mknod -m 666 /mnt/rootfs/dev/urandom c 1 9
     chroot /mnt/rootfs /bin/bash -lc "
       set -euo pipefail
       apt-get update >/dev/null
