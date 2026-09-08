@@ -3,21 +3,17 @@ package com.droidvibe.nativeusb
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import java.util.zip.GZIPInputStream
 
-/** Runs a real Arduino CLI toolchain locally on the Android device.
- *
- * The APK contains an AArch64 Debian userland, Arduino CLI and the board
- * packages/toolchains. PRoot supplies the Linux userspace boundary without
- * requiring root. This mirrors ArduinoDroid's important property: compilation
- * remains local and works offline after the toolchain is present.
- */
+/** Runs a real Arduino CLI toolchain locally on the Android device. */
 object LocalToolchain {
     private const val TAG = "DroidVibeLocalToolchain"
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
@@ -62,7 +58,6 @@ object LocalToolchain {
             "--warnings", "all",
             "/work/$safeName",
         )
-
         val process = ProcessBuilder(command)
             .directory(job)
             .redirectErrorStream(true)
@@ -79,10 +74,9 @@ object LocalToolchain {
             .start()
 
         val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        val finished = process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)
-        if (!finished) {
+        if (!process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
             process.destroyForcibly()
-            return CompileResult(false, listOf(diag("error", safeName + ".ino", 0, 0, "Local compilation timed out after $TIMEOUT_MINUTES minutes")), null, null, fqbn, System.currentTimeMillis() - started, output)
+            return CompileResult(false, listOf(diag("error", "$safeName.ino", 0, 0, "Local compilation timed out after $TIMEOUT_MINUTES minutes")), null, null, fqbn, System.currentTimeMillis() - started, output)
         }
 
         val firmwareFile = findFirmware(buildDir, fqbn)
@@ -92,8 +86,9 @@ object LocalToolchain {
         val finalOutput = if (ok) output else if (firmwareFile == null && process.exitValue() == 0) {
             output + "\nDroidVibe: compiler exited successfully but no .hex/.uf2/.bin artifact was produced."
         } else output
-        return CompileResult(ok, diagnostics, firmwareB64, firmwareFile?.absolutePath, fqbn, System.currentTimeMillis() - started, finalOutput)
-            .also { cleanupAsync(job) }
+        val result = CompileResult(ok, diagnostics, firmwareB64, firmwareFile?.absolutePath, fqbn, System.currentTimeMillis() - started, finalOutput)
+        cleanupAsync(job)
+        return result
     }
 
     data class InstalledPaths(val root: File, val rootfs: File, val proot: File)
@@ -110,28 +105,41 @@ object LocalToolchain {
         if (root.exists()) root.deleteRecursively()
         root.mkdirs()
         extractAsset(context, ASSET_PROOT, proot)
-        if (!proot.setExecutable(true, false)) {
-            throw IllegalStateException("Android refused to mark the local compiler runtime executable")
-        }
+        if (!proot.setExecutable(true, false)) throw IllegalStateException("Android refused to mark the local compiler runtime executable")
         rootfs.mkdirs()
         context.assets.open(ASSET_ROOTFS).use { input ->
             GZIPInputStream(BufferedInputStream(input, 64 * 1024)).use { gzip ->
                 TarArchiveInputStream(BufferedInputStream(gzip, 64 * 1024)).use { tar ->
-                    var entry = tar.nextTarEntry
+                    var entry: TarArchiveEntry? = tar.nextTarEntry
                     while (entry != null) {
-                        val clean = entry.name.removePrefix("/")
-                        if (clean.contains("..")) throw SecurityException("Invalid toolchain archive path")
+                        val current = entry
+                        val clean = current.name.removePrefix("/")
+                        if (clean.isBlank() || clean.split('/').any { it == ".." }) throw SecurityException("Invalid toolchain archive path")
                         val out = File(rootfs, clean)
-                        if (!out.canonicalPath.startsWith(rootfs.canonicalPath + File.separator)) {
-                            throw SecurityException("Toolchain archive escaped rootfs")
-                        }
-                        if (entry.isDirectory) {
-                            out.mkdirs()
-                        } else {
-                            out.parentFile?.mkdirs()
-                            FileOutputStream(out).use { fos -> tar.copyTo(fos) }
-                            if ((entry.mode and 0b00100) != 0) out.setExecutable(true, false)
-                            if ((entry.mode and 0b00010) != 0) out.setWritable(true, false)
+                        if (!out.canonicalPath.startsWith(rootfs.canonicalPath + File.separator)) throw SecurityException("Toolchain archive escaped rootfs")
+                        when {
+                            current.isDirectory -> out.mkdirs()
+                            current.isSymbolicLink -> {
+                                out.parentFile?.mkdirs()
+                                val target = current.linkName
+                                if (target.isBlank() || target.split('/').any { it == ".." }) throw SecurityException("Invalid toolchain symlink")
+                                runCatching { Files.deleteIfExists(out.toPath()) }
+                                Files.createSymbolicLink(out.toPath(), File(target).toPath())
+                            }
+                            current.isLink -> {
+                                out.parentFile?.mkdirs()
+                                val targetName = current.linkName.removePrefix("/")
+                                val target = File(rootfs, targetName)
+                                if (!target.canonicalPath.startsWith(rootfs.canonicalPath + File.separator)) throw SecurityException("Invalid hard link target")
+                                runCatching { Files.deleteIfExists(out.toPath()) }
+                                Files.createLink(out.toPath(), target.toPath())
+                            }
+                            else -> {
+                                out.parentFile?.mkdirs()
+                                FileOutputStream(out).use { fos -> tar.copyTo(fos) }
+                                out.setExecutable((current.mode and 0b00100) != 0 || (current.mode and 0b00010) != 0, false)
+                                out.setReadable(true, false)
+                            }
                         }
                         entry = tar.nextTarEntry
                     }
@@ -143,9 +151,7 @@ object LocalToolchain {
     }
 
     private fun extractAsset(context: Context, asset: String, target: File) {
-        context.assets.open(asset).use { input ->
-            FileOutputStream(target).use { output -> input.copyTo(output, 64 * 1024) }
-        }
+        context.assets.open(asset).use { input -> FileOutputStream(target).use { output -> input.copyTo(output, 64 * 1024) } }
     }
 
     private fun findFirmware(buildDir: File, fqbn: String): File? {
@@ -167,11 +173,7 @@ object LocalToolchain {
         output.lineSequence().forEach { line ->
             val m = gcc.matcher(line.trim())
             if (m.find()) {
-                val sev = when (m.group(4)) {
-                    "warning" -> "warning"
-                    "note" -> "info"
-                    else -> "error"
-                }
+                val sev = when (m.group(4)) { "warning" -> "warning"; "note" -> "info"; else -> "error" }
                 out += diag(sev, m.group(1) ?: defaultFile, m.group(2)?.toIntOrNull() ?: 0, m.group(3)?.toIntOrNull() ?: 0, m.group(5) ?: line)
             }
         }
@@ -188,12 +190,8 @@ object LocalToolchain {
 
     private fun cleanupAsync(job: File) {
         Thread {
-            try {
-                Thread.sleep(5000)
-                job.deleteRecursively()
-            } catch (_: Exception) {
-                Log.w(TAG, "Could not clean local compiler job ${job.absolutePath}")
-            }
+            try { Thread.sleep(5000); job.deleteRecursively() }
+            catch (_: Exception) { Log.w(TAG, "Could not clean local compiler job ${job.absolutePath}") }
         }.start()
     }
 }
