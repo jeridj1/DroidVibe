@@ -118,7 +118,8 @@ cat "${WORK}/manifest.txt"
 
 sudo rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
 
-tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
+sudo tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
+sudo chmod 0644 "$ARCHIVE"
 test -s "$ARCHIVE"
 test -s "$PROOT"
 ls -lh "$ARCHIVE" "$PROOT"
