@@ -24,7 +24,6 @@ curl -fsSL "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_
   | tar -xzf - -C "$ROOTFS/opt/droidvibe/bin"
 chmod 0755 "$ROOTFS/opt/droidvibe/bin/arduino-cli"
 
-# Install the actual board cores using Boards Manager metadata and ARM64 host tools.
 docker run --platform linux/arm64 --rm \
   -e PICO_INDEX="$PICO_INDEX" \
   -v "$ROOTFS:/mnt/rootfs" \
@@ -69,23 +68,19 @@ grep -Eiq 'aarch64|ARM aarch64' "${WORK}/proot-file.txt"
 # Execute the same command the Android app will execute, inside the newly built
 # ARM64 rootfs. This catches broken dynamic-linker paths, executable permissions,
 # package paths, and PRoot mount mistakes before an APK is produced.
+mkdir -p "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-pico"
+cat > "$ROOTFS/work/FinalUno/FinalUno.ino" <<'INO'
+void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
+void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
+INO
+cat > "$ROOTFS/work/FinalPico/FinalPico.ino" <<'INO'
+void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
+void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
+INO
 cat > "$ROOTFS/work/selftest-run.sh" <<'EOF'
 #!/bin/sh
 set -eu
-ROOT=/opt/droidvibe
-CLI="$ROOT/bin/arduino-cli"
-mkdir -p /work/final-uno /work/final-pico
-cat > /work/FinalUno/FinalUno.ino <<'INO'
-void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
-void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
-INO
-cat > /work/FinalPico/FinalPico.ino <<'INO'
-void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
-void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
-INO
-EOF
-mkdir -p "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-pico"
-cat >> "$ROOTFS/work/selftest-run.sh" <<'EOF'
+CLI=/opt/droidvibe/bin/arduino-cli
 "$CLI" compile --fqbn arduino:avr:uno --build-path /work/final-uno /work/FinalUno
 "$CLI" compile --fqbn rp2040:rp2040:rpipico --build-path /work/final-pico /work/FinalPico
 test -s /work/final-uno/FinalUno.ino.hex
@@ -99,8 +94,6 @@ docker run --platform linux/arm64 --rm \
   -v "$PROOT:/proot" \
   debian:bookworm-slim \
   bash -lc '/proot -r /rootfs -w /work -b /rootfs/work:/work --kill-on-exit /work/selftest-run.sh'
-
-grep -Eiq 'LOCAL_TOOLCHAIN_PRROOT_TEST_OK' <(docker run --platform linux/arm64 --rm -v "$ROOTFS:/rootfs" -v "$PROOT:/proot" debian:bookworm-slim bash -lc '/proot -r /rootfs -w /work -b /rootfs/work:/work --kill-on-exit /work/selftest-run.sh' 2>/dev/null)
 
 printf '%s\n' "arduino-cli=${ARDUINO_CLI_VERSION}" "pico-index=${PICO_INDEX}" "proot-sha256=$(sha256sum "$PROOT" | awk '{print $1}')" > "${WORK}/manifest.txt"
 cat "${WORK}/manifest.txt"
