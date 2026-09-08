@@ -32,7 +32,7 @@ docker run --platform linux/arm64 --rm \
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     apt-get update >/dev/null
-    apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 python3 >/dev/null
+    apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 >/dev/null
     rm -f /mnt/rootfs/etc/resolv.conf
     cp /etc/resolv.conf /mnt/rootfs/etc/resolv.conf
     mkdir -p /mnt/rootfs/dev /mnt/rootfs/dev/pts /mnt/rootfs/run
@@ -46,8 +46,9 @@ docker run --platform linux/arm64 --rm \
       apt-get update >/dev/null
       apt-get install -y --no-install-recommends python3 ca-certificates curl git unzip xz-utils bzip2 >/dev/null
       rm -rf /var/lib/apt/lists/* /var/cache/apt/* /usr/share/doc/* /usr/share/man/* /usr/share/locale/*
+      test -x /usr/bin/python3
+      /usr/bin/python3 --version
     "
-    test -x /mnt/rootfs/usr/bin/python3
     mkdir -p /mnt/rootfs/opt/droidvibe/data /mnt/rootfs/opt/droidvibe/user /mnt/rootfs/work /mnt/rootfs/etc/ssl/certs
     export HOME=/root
     export ARDUINO_DATA_DIR=/mnt/rootfs/opt/droidvibe/data
@@ -60,26 +61,6 @@ docker run --platform linux/arm64 --rm \
     "$CLI" core install arduino:megaavr
     "$CLI" core install rp2040:rp2040
     "$CLI" core list
-
-    mkdir -p /mnt/rootfs/work/selftest/UnoBlink /mnt/rootfs/work/selftest/MegaBlink /mnt/rootfs/work/selftest/PicoBlink
-    cat > /mnt/rootfs/work/selftest/UnoBlink/UnoBlink.ino <<EOF
-void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
-void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
-EOF
-    cat > /mnt/rootfs/work/selftest/MegaBlink/MegaBlink.ino <<EOF
-void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
-void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
-EOF
-    cat > /mnt/rootfs/work/selftest/PicoBlink/PicoBlink.ino <<EOF
-void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
-void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
-EOF
-    "$CLI" compile --fqbn arduino:avr:uno --build-path /mnt/rootfs/work/selftest/uno-build /mnt/rootfs/work/selftest/UnoBlink
-    "$CLI" compile --fqbn arduino:megaavr:nona4809 --build-path /mnt/rootfs/work/selftest/mega-build /mnt/rootfs/work/selftest/MegaBlink
-    "$CLI" compile --fqbn rp2040:rp2040:rpipico --build-path /mnt/rootfs/work/selftest/pico-build /mnt/rootfs/work/selftest/PicoBlink
-    test -s /mnt/rootfs/work/selftest/uno-build/UnoBlink.ino.hex
-    test -s /mnt/rootfs/work/selftest/mega-build/MegaBlink.ino.hex
-    test -n "$(find /mnt/rootfs/work/selftest/pico-build -type f -name "*.uf2" -print -quit)"
   '
 
 PROOT_URL="https://sourceforge.net/projects/proot.mirror/files/v5.3.0/proot-v5.3.0-aarch64-static/download"
@@ -105,11 +86,16 @@ cat > "$ROOTFS/work/selftest-run.sh" <<'EOF'
 #!/bin/sh
 set -eu
 CLI=/opt/droidvibe/bin/arduino-cli
+PATH=/opt/droidvibe/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+python3 --version
+"$CLI" version
+"$CLI" core list
 "$CLI" compile --fqbn arduino:avr:uno --build-path /work/final-uno /work/FinalUno
-"$CLI" compile --fqbn arduino:megaavr:nona4809 --build-path /work/final-mega /work/FinalMega
-"$CLI" compile --fqbn rp2040:rp2040:rpipico --build-path /work/final-pico /work/FinalPico
 test -s /work/final-uno/FinalUno.ino.hex
+"$CLI" compile --fqbn arduino:megaavr:nona4809 --build-path /work/final-mega /work/FinalMega
 test -s /work/final-mega/FinalMega.ino.hex
+"$CLI" compile --fqbn rp2040:rp2040:rpipico --build-path /work/final-pico /work/FinalPico
 test -n "$(find /work/final-pico -type f -name '*.uf2' -print -quit)"
 echo LOCAL_TOOLCHAIN_PRROOT_TEST_OK
 EOF
@@ -124,7 +110,7 @@ docker run --platform linux/arm64 --rm \
 printf '%s\n' "arduino-cli=${ARDUINO_CLI_VERSION}" "pico-index=${PICO_INDEX}" "proot-sha256=$(sha256sum "$PROOT" | awk '{print $1}')" > "${WORK}/manifest.txt"
 cat "${WORK}/manifest.txt"
 
-rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/selftest" "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
+rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
 
 tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
 test -s "$ARCHIVE"
