@@ -116,7 +116,7 @@ docker run --platform linux/arm64 --rm \
 printf '%s\n' "arduino-cli=${ARDUINO_CLI_VERSION}" "pico-index=${PICO_INDEX}" "proot-sha256=$(sha256sum "$PROOT" | awk '{print $1}')" > "${WORK}/manifest.txt"
 cat "${WORK}/manifest.txt"
 
-rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
+sudo rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
 
 tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
 test -s "$ARCHIVE"
