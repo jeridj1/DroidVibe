@@ -70,7 +70,7 @@ chmod 0755 "$PROOT"
 file "$PROOT" | tee "${WORK}/proot-file.txt"
 grep -Eiq 'aarch64|ARM aarch64' "${WORK}/proot-file.txt"
 
-mkdir -p "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico"
+mkdir -p "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/user"
 cat > "$ROOTFS/work/FinalUno/FinalUno.ino" <<'INO'
 void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
 void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
@@ -89,6 +89,9 @@ set -eu
 CLI=/opt/droidvibe/bin/arduino-cli
 PATH=/opt/droidvibe/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
+export HOME=/root
+export ARDUINO_DATA_DIR=/opt/droidvibe/data
+export ARDUINO_USER_DIR=/work/user
 python3 --version
 "$CLI" version
 "$CLI" core list
