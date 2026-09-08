@@ -135,11 +135,34 @@ jobs:
             exit 1
           fi
 
+  toolchain:
+    name: Build ARM64 Arduino Toolchain
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    needs: mobile-prebuild
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify on native ARM64
+        run: |
+          chmod +x scripts/build-mobile-toolchain.sh
+          scripts/build-mobile-toolchain.sh "$RUNNER_TEMP/droidvibe-assets"
+          test -s "$RUNNER_TEMP/droidvibe-assets/droidvibe-toolchain-rootfs.tar.gz"
+          test -s "$RUNNER_TEMP/droidvibe-assets/droidvibe-toolchain-proot"
+      - name: Upload verified toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: droidvibe-local-toolchain
+          path: |
+            ${{ runner.temp }}/droidvibe-assets/droidvibe-toolchain-rootfs.tar.gz
+            ${{ runner.temp }}/droidvibe-assets/droidvibe-toolchain-proot
+          if-no-files-found: error
+          retention-days: 30
+
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 75
-    needs: mobile-prebuild
+    needs: [mobile-prebuild, toolchain]
     env:
       EXPO_NO_TELEMETRY: "1"
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx3g"
@@ -155,9 +178,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
       - uses: actions/cache@v4
         with:
           path: |
@@ -174,19 +194,15 @@ jobs:
       - name: Expo prebuild
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean
-      - name: Build and verify on-device Arduino toolchain
-        run: |
-          chmod +x scripts/build-mobile-toolchain.sh
-          scripts/build-mobile-toolchain.sh apps/mobile/android/app/src/main/assets
-      - name: Upload bundled toolchain manifest
-        uses: actions/upload-artifact@v4
+      - name: Download verified ARM64 toolchain
+        uses: actions/download-artifact@v4
         with:
-          name: droidvibe-local-toolchain-manifest
-          path: |
-            apps/mobile/android/app/src/main/assets/droidvibe-toolchain-rootfs.tar.gz
-            apps/mobile/android/app/src/main/assets/droidvibe-toolchain-proot
-          if-no-files-found: error
-          retention-days: 30
+          name: droidvibe-local-toolchain
+          path: apps/mobile/android/app/src/main/assets
+      - name: Verify bundled toolchain files
+        run: |
+          test -s apps/mobile/android/app/src/main/assets/droidvibe-toolchain-rootfs.tar.gz
+          test -s apps/mobile/android/app/src/main/assets/droidvibe-toolchain-proot
       - name: Build RP2040 logic analyzer helper
         env:
           PICO_SDK_VERSION: 2.1.1
