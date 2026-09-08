@@ -32,7 +32,8 @@ docker run --platform linux/arm64 --rm \
     set -euo pipefail
     apt-get update >/dev/null
     apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 >/dev/null
-    mkdir -p /mnt/rootfs/opt/droidvibe/data /mnt/rootfs/opt/droidvibe/user /mnt/rootfs/work
+    mkdir -p /mnt/rootfs/opt/droidvibe/data /mnt/rootfs/opt/droidvibe/user /mnt/rootfs/work /mnt/rootfs/etc/ssl/certs
+    cp /etc/ssl/certs/ca-certificates.crt /mnt/rootfs/etc/ssl/certs/ca-certificates.crt
     export HOME=/root
     export ARDUINO_DATA_DIR=/mnt/rootfs/opt/droidvibe/data
     export ARDUINO_USER_DIR=/mnt/rootfs/opt/droidvibe/user
