@@ -30,8 +30,9 @@ docker run --platform linux/arm64 --rm \
   debian:bookworm-slim \
   bash -lc '
     set -euo pipefail
+    export DEBIAN_FRONTEND=noninteractive
     apt-get update >/dev/null
-    apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 >/dev/null
+    apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 python3 >/dev/null
     rm -f /mnt/rootfs/etc/resolv.conf
     cp /etc/resolv.conf /mnt/rootfs/etc/resolv.conf
     mkdir -p /mnt/rootfs/dev /mnt/rootfs/dev/pts /mnt/rootfs/run
@@ -41,10 +42,12 @@ docker run --platform linux/arm64 --rm \
     [ -e /mnt/rootfs/dev/urandom ] || mknod -m 666 /mnt/rootfs/dev/urandom c 1 9
     chroot /mnt/rootfs /bin/bash -lc "
       set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
       apt-get update >/dev/null
       apt-get install -y --no-install-recommends python3 ca-certificates curl git unzip xz-utils bzip2 >/dev/null
       rm -rf /var/lib/apt/lists/* /var/cache/apt/* /usr/share/doc/* /usr/share/man/* /usr/share/locale/*
     "
+    test -x /mnt/rootfs/usr/bin/python3
     mkdir -p /mnt/rootfs/opt/droidvibe/data /mnt/rootfs/opt/droidvibe/user /mnt/rootfs/work /mnt/rootfs/etc/ssl/certs
     export HOME=/root
     export ARDUINO_DATA_DIR=/mnt/rootfs/opt/droidvibe/data
