@@ -18,7 +18,7 @@ object LocalToolchain {
     private const val TAG = "DroidVibeLocalToolchain"
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-pico5"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico5"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -71,8 +71,7 @@ object LocalToolchain {
         val process = startProcess(cliCommand(root, args, work), work)
         val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (!process.waitFor(timeoutMinutes, TimeUnit.MINUTES)) {
-            process.destroyForcibly()
-            cleanupAsync(work)
+            process.destroyForcibly(); cleanupAsync(work)
             return false to (output + "\nDroidVibe: Arduino CLI operation timed out.")
         }
         val ok = process.exitValue() == 0
@@ -147,20 +146,17 @@ object LocalToolchain {
     }.start()
 
     private fun extractAsset(context: Context, asset: String, target: File) { context.assets.open(asset).use { input -> FileOutputStream(target).use { output -> input.copyTo(output, 64 * 1024) } } }
-
     private fun findFirmware(buildDir: File, fqbn: String): File? {
         if (!buildDir.isDirectory) return null
         val files = buildDir.walkTopDown().filter { it.isFile }.toList()
         val preferred = when { fqbn.startsWith("rp2040:") -> listOf(".uf2", ".bin", ".hex"); fqbn.startsWith("esp32:") -> listOf(".bin", ".hex", ".uf2"); else -> listOf(".hex", ".bin", ".uf2") }
         return preferred.asSequence().flatMap { ext -> files.filter { it.extension.equals(ext.removePrefix("."), true) }.asSequence() }.maxByOrNull { it.length() }
     }
-
     private fun parseDiagnostics(output: String, defaultFile: String): List<Map<String, Any?>> {
         val out = ArrayList<Map<String, Any?>>(); val gcc = Pattern.compile("^(.+?):(\\d+):(\\d+):\\s*(fatal error|error|warning|note):\\s*(.+)$")
         output.lineSequence().forEach { line -> val m = gcc.matcher(line.trim()); if (m.find()) { val sev = when (m.group(4)) { "warning" -> "warning"; "note" -> "info"; else -> "error" }; out += diag(sev, m.group(1) ?: defaultFile, m.group(2)?.toIntOrNull() ?: 0, m.group(3)?.toIntOrNull() ?: 0, m.group(5) ?: line) } }
         return out
     }
-
     private fun diag(severity: String, file: String, line: Int, column: Int, message: String): Map<String, Any?> = mapOf("severity" to severity, "file" to file, "line" to line, "column" to column, "message" to message)
     private fun cleanupAsync(job: File) { Thread { try { Thread.sleep(5000); job.deleteRecursively() } catch (_: Exception) { Log.w(TAG, "Could not clean local compiler job ${job.absolutePath}") } }.start() }
 }
