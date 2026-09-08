@@ -32,6 +32,7 @@ docker run --platform linux/arm64 --rm \
     set -euo pipefail
     apt-get update >/dev/null
     apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 >/dev/null
+    rm -f /mnt/rootfs/etc/resolv.conf
     cp -L /etc/resolv.conf /mnt/rootfs/etc/resolv.conf
     chroot /mnt/rootfs /bin/bash -lc "
       set -euo pipefail
