@@ -171,6 +171,9 @@ jobs:
         run: |
           npm install --prefix /tmp/asset-tools sharp
           NODE_PATH=/tmp/asset-tools/node_modules node scripts/generate-assets.js
+      - name: Expo prebuild
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install --clean
       - name: Build and verify on-device Arduino toolchain
         run: |
           chmod +x scripts/build-mobile-toolchain.sh
@@ -212,9 +215,6 @@ jobs:
           path: /tmp/rp2040-build/droidvibe_rp2040_logic_analyzer.uf2
           if-no-files-found: error
           retention-days: 30
-      - name: Expo prebuild
-        working-directory: apps/mobile
-        run: pnpm exec expo prebuild --platform android --no-install --clean
       - name: Accept SDK licenses & install components
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
