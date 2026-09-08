@@ -22,6 +22,11 @@ export interface DroidVibeUsbModuleType {
   getRp2040Mode(deviceId: string): Promise<{ mode: RP2040Mode; isRP2040: boolean }>;
   compileLocal(input: { name: string; fqbn: string; files: Array<{ path: string; content: string }> }): Promise<CompileResult>;
   isLocalToolchainInstalled(): Promise<boolean>;
+  boardManagerAddUrl(url: string): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerUpdateIndexes(): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerInstallCore(core: string): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerListCores(): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerListBoards(): Promise<{ ok: boolean; stdout: string }>;
 }
 
 interface RawNativeModule {
@@ -37,6 +42,11 @@ interface RawNativeModule {
 interface RawCompilerModule {
   compileLocal(input: { name: string; fqbn: string; filesJson: string }): Promise<CompileResult>;
   isLocalToolchainInstalled(): Promise<boolean>;
+  boardManagerAddUrl(input: { value: string }): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerUpdateIndexes(): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerInstallCore(input: { value: string }): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerListCores(): Promise<{ ok: boolean; stdout: string }>;
+  boardManagerListBoards(): Promise<{ ok: boolean; stdout: string }>;
 }
 function mapUploadRequest(req: UploadRequest) { return { deviceId: req.device.id, vendorId: req.device.vendorId, productId: req.device.productId, protocol: req.protocol, firmwareBase64: req.firmware, filename: req.filename, baudRate: req.baudRate ?? 115200, verify: req.verify }; }
 
@@ -56,6 +66,11 @@ export function getNativeUsbModule(): DroidVibeUsbModuleType | null {
       isRp2040Bootsel: id => raw.isRp2040Bootsel(id), getRp2040Mode: id => raw.getRp2040Mode(id),
       compileLocal: input => { if (!compiler) return Promise.reject(new Error('Local compiler module unavailable; use a DroidVibe APK build, not Expo Go.')); return compiler.compileLocal({ name: input.name, fqbn: input.fqbn, filesJson: JSON.stringify(input.files) }); },
       isLocalToolchainInstalled: () => compiler?.isLocalToolchainInstalled() ?? Promise.resolve(false),
+      boardManagerAddUrl: url => compiler ? compiler.boardManagerAddUrl({ value: url }) : Promise.reject(new Error('Local compiler module unavailable.')),
+      boardManagerUpdateIndexes: () => compiler ? compiler.boardManagerUpdateIndexes() : Promise.reject(new Error('Local compiler module unavailable.')),
+      boardManagerInstallCore: core => compiler ? compiler.boardManagerInstallCore({ value: core }) : Promise.reject(new Error('Local compiler module unavailable.')),
+      boardManagerListCores: () => compiler ? compiler.boardManagerListCores() : Promise.reject(new Error('Local compiler module unavailable.')),
+      boardManagerListBoards: () => compiler ? compiler.boardManagerListBoards() : Promise.reject(new Error('Local compiler module unavailable.')),
     };
   } catch { return null; }
 }
