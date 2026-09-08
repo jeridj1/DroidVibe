@@ -103,6 +103,8 @@ EOF
 chmod 0755 "$ROOTFS/work/selftest-run.sh"
 
 docker run --platform linux/arm64 --rm \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=unconfined \
   -v "$ROOTFS:/rootfs" \
   -v "$(realpath "$PROOT"):/proot:ro" \
   debian:bookworm-slim \
