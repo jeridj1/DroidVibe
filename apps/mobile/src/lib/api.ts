@@ -45,7 +45,7 @@ async function rpc<T>(path: string, input: unknown): Promise<T> {
   return json.data as T;
 }
 
-async function compileLocalOrExplain(input: {
+async function compileLocal(input: {
   name: string;
   fqbn: string;
   files: Array<{ path: string; content: string }>;
@@ -54,17 +54,12 @@ async function compileLocalOrExplain(input: {
   if (!native) {
     throw new Error('Local compiler unavailable. Install the DroidVibe APK with the bundled Android toolchain; Expo Go cannot execute it.');
   }
-  const main = input.files.find(f => /\.ino$/i.test(f.path)) ?? input.files[0];
-  if (!main) throw new Error('Sketch contains no source files.');
-  return native.compileLocal({ name: input.name, fqbn: input.fqbn, code: main.content });
+  if (!input.files.length) throw new Error('Sketch contains no source files.');
+  return native.compileLocal(input);
 }
 
 export const api = {
-  compile: async (input: {
-    name: string;
-    fqbn: string;
-    files: Array<{ path: string; content: string }>;
-  }) => compileLocalOrExplain(input),
+  compile: (input: { name: string; fqbn: string; files: Array<{ path: string; content: string }> }) => compileLocal(input),
   compileRemote: (input: unknown) => rpc('compile', input),
   diagnostics: { explain: (input: unknown) => rpc('diagnostics/explain', input) },
   boards: { list: (input: { query?: string }) => rpc('boards/list', input) },
