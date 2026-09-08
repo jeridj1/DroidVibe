@@ -18,7 +18,7 @@ object LocalToolchain {
     private const val TAG = "DroidVibeLocalToolchain"
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico5"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
