@@ -2,6 +2,7 @@
 set -euo pipefail
 
 OUT="${1:-apps/mobile/android/app/src/main/assets}"
+OUT="$(realpath -m "$OUT")"
 WORK="${RUNNER_TEMP:-/tmp}/droidvibe-toolchain"
 ROOTFS="${WORK}/rootfs"
 ARCHIVE="${OUT}/droidvibe-toolchain-rootfs.tar.gz"
@@ -103,7 +104,7 @@ chmod 0755 "$ROOTFS/work/selftest-run.sh"
 
 docker run --platform linux/arm64 --rm \
   -v "$ROOTFS:/rootfs" \
-  -v "$PROOT:/proot" \
+  -v "$(realpath "$PROOT"):/proot:ro" \
   debian:bookworm-slim \
   bash -lc '/proot -r /rootfs -w /work -b /rootfs/work:/work --kill-on-exit /work/selftest-run.sh'
 
