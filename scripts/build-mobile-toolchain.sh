@@ -17,7 +17,7 @@ cid="$(docker create --platform linux/arm64 debian:bookworm-slim)"
 docker export "$cid" | tar -xpf - -C "$ROOTFS"
 docker rm "$cid" >/dev/null
 
-rm -rf "$ROOTFS/var/cache/apt" "$ROOTFS/var/lib/apt/lists"/* "$ROOTFS/usr/share/doc" "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/locale" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/run" "$ROOTFS/tmp"/*
+rm -rf "$ROOTFS/var/cache/apt" "$ROOTFS/usr/share/doc" "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/locale" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/run" "$ROOTFS/tmp"/*
 mkdir -p "$ROOTFS/tmp" "$ROOTFS/work"
 
 curl -fsSL "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_ARM64.tar.gz" \
@@ -32,8 +32,14 @@ docker run --platform linux/arm64 --rm \
     set -euo pipefail
     apt-get update >/dev/null
     apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils bzip2 >/dev/null
+    chroot /mnt/rootfs /bin/bash -lc "
+      set -euo pipefail
+      apt-get update >/dev/null
+      apt-get install -y --no-install-recommends python3 ca-certificates curl git unzip xz-utils bzip2 >/dev/null
+      rm -rf /var/lib/apt/lists/* /var/cache/apt/* /usr/share/doc/* /usr/share/man/* /usr/share/locale/*
+    "
     mkdir -p /mnt/rootfs/opt/droidvibe/data /mnt/rootfs/opt/droidvibe/user /mnt/rootfs/work /mnt/rootfs/etc/ssl/certs
-    cp /etc/ssl/certs/ca-certificates.crt /mnt/rootfs/etc/ssl/certs/ca-certificates.crt
+    cp /mnt/rootfs/etc/ssl/certs/ca-certificates.crt /mnt/rootfs/etc/ssl/certs/ca-certificates.crt
     export HOME=/root
     export ARDUINO_DATA_DIR=/mnt/rootfs/opt/droidvibe/data
     export ARDUINO_USER_DIR=/mnt/rootfs/opt/droidvibe/user
