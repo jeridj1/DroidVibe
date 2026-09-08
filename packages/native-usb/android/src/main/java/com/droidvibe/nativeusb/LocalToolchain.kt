@@ -1,0 +1,199 @@
+package com.droidvibe.nativeusb
+
+import android.content.Context
+import android.util.Base64
+import android.util.Log
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
+import java.util.regex.Pattern
+import java.util.zip.GZIPInputStream
+
+/** Runs a real Arduino CLI toolchain locally on the Android device.
+ *
+ * The APK contains an AArch64 Debian userland, Arduino CLI and the board
+ * packages/toolchains. PRoot supplies the Linux userspace boundary without
+ * requiring root. This mirrors ArduinoDroid's important property: compilation
+ * remains local and works offline after the toolchain is present.
+ */
+object LocalToolchain {
+    private const val TAG = "DroidVibeLocalToolchain"
+    private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
+    private const val ASSET_PROOT = "droidvibe-toolchain-proot"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-pico5"
+    private const val MARKER = ".installed"
+    private const val TIMEOUT_MINUTES = 5L
+
+    data class CompileResult(
+        val ok: Boolean,
+        val diagnostics: List<Map<String, Any?>>,
+        val firmware: String?,
+        val firmwarePath: String?,
+        val fqbn: String,
+        val durationMs: Long,
+        val stdout: String,
+    )
+
+    fun compile(context: Context, name: String, fqbn: String, source: String): CompileResult {
+        val started = System.currentTimeMillis()
+        val root = ensureInstalled(context)
+        val safeName = name.replace(Regex("[^A-Za-z0-9_]+"), "_").ifBlank { "Sketch" }
+        val job = File(context.cacheDir, "compile-$started-$safeName")
+        val sketchDir = File(job, safeName)
+        val buildDir = File(job, "build")
+        sketchDir.mkdirs()
+        buildDir.mkdirs()
+        File(sketchDir, "$safeName.ino").writeText(source, Charsets.UTF_8)
+        File(job, "user").mkdirs()
+        File(job, "cache").mkdirs()
+
+        val command = listOf(
+            root.proot.absolutePath,
+            "-r", root.rootfs.absolutePath,
+            "-w", "/work",
+            "-b", "${job.absolutePath}:/work",
+            "--kill-on-exit",
+            "/opt/droidvibe/bin/arduino-cli",
+            "compile",
+            "--fqbn", fqbn,
+            "--build-path", "/work/build",
+            "--warnings", "all",
+            "/work/$safeName",
+        )
+
+        val process = ProcessBuilder(command)
+            .directory(job)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["HOME"] = "/root"
+                environment()["PATH"] = "/opt/droidvibe/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                environment()["ARDUINO_DATA_DIR"] = "/opt/droidvibe/data"
+                environment()["ARDUINO_USER_DIR"] = "/work/user"
+                environment()["TMPDIR"] = "/work/cache"
+                environment()["LC_ALL"] = "C"
+                environment()["LANG"] = "C"
+                environment()["PROOT_NO_SECCOMP"] = "1"
+            }
+            .start()
+
+        val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val finished = process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)
+        if (!finished) {
+            process.destroyForcibly()
+            return CompileResult(false, listOf(diag("error", safeName + ".ino", 0, 0, "Local compilation timed out after $TIMEOUT_MINUTES minutes")), null, null, fqbn, System.currentTimeMillis() - started, output)
+        }
+
+        val firmwareFile = findFirmware(buildDir, fqbn)
+        val firmwareB64 = firmwareFile?.let { Base64.encodeToString(it.readBytes(), Base64.NO_WRAP) }
+        val diagnostics = parseDiagnostics(output, safeName)
+        val ok = process.exitValue() == 0 && firmwareFile != null
+        val finalOutput = if (ok) output else if (firmwareFile == null && process.exitValue() == 0) {
+            output + "\nDroidVibe: compiler exited successfully but no .hex/.uf2/.bin artifact was produced."
+        } else output
+        return CompileResult(ok, diagnostics, firmwareB64, firmwareFile?.absolutePath, fqbn, System.currentTimeMillis() - started, finalOutput)
+            .also { cleanupAsync(job) }
+    }
+
+    data class InstalledPaths(val root: File, val rootfs: File, val proot: File)
+
+    @Synchronized
+    fun ensureInstalled(context: Context): InstalledPaths {
+        val root = File(context.filesDir, "droidvibe-toolchain")
+        val rootfs = File(root, "rootfs")
+        val proot = File(root, "proot")
+        val marker = File(root, MARKER)
+        if (marker.isFile && marker.readText() == VERSION && proot.canExecute() && File(rootfs, "opt/droidvibe/bin/arduino-cli").isFile) {
+            return InstalledPaths(root, rootfs, proot)
+        }
+        if (root.exists()) root.deleteRecursively()
+        root.mkdirs()
+        extractAsset(context, ASSET_PROOT, proot)
+        if (!proot.setExecutable(true, false)) {
+            throw IllegalStateException("Android refused to mark the local compiler runtime executable")
+        }
+        rootfs.mkdirs()
+        context.assets.open(ASSET_ROOTFS).use { input ->
+            GZIPInputStream(BufferedInputStream(input, 64 * 1024)).use { gzip ->
+                TarArchiveInputStream(BufferedInputStream(gzip, 64 * 1024)).use { tar ->
+                    var entry = tar.nextTarEntry
+                    while (entry != null) {
+                        val clean = entry.name.removePrefix("/")
+                        if (clean.contains("..")) throw SecurityException("Invalid toolchain archive path")
+                        val out = File(rootfs, clean)
+                        if (!out.canonicalPath.startsWith(rootfs.canonicalPath + File.separator)) {
+                            throw SecurityException("Toolchain archive escaped rootfs")
+                        }
+                        if (entry.isDirectory) {
+                            out.mkdirs()
+                        } else {
+                            out.parentFile?.mkdirs()
+                            FileOutputStream(out).use { fos -> tar.copyTo(fos) }
+                            if ((entry.mode and 0b00100) != 0) out.setExecutable(true, false)
+                            if ((entry.mode and 0b00010) != 0) out.setWritable(true, false)
+                        }
+                        entry = tar.nextTarEntry
+                    }
+                }
+            }
+        }
+        marker.writeText(VERSION, Charsets.UTF_8)
+        return InstalledPaths(root, rootfs, proot)
+    }
+
+    private fun extractAsset(context: Context, asset: String, target: File) {
+        context.assets.open(asset).use { input ->
+            FileOutputStream(target).use { output -> input.copyTo(output, 64 * 1024) }
+        }
+    }
+
+    private fun findFirmware(buildDir: File, fqbn: String): File? {
+        if (!buildDir.isDirectory) return null
+        val files = buildDir.walkTopDown().filter { it.isFile }.toList()
+        val preferred = when {
+            fqbn.startsWith("rp2040:") -> listOf(".uf2", ".bin", ".hex")
+            fqbn.startsWith("esp32:") -> listOf(".bin", ".hex", ".uf2")
+            else -> listOf(".hex", ".bin", ".uf2")
+        }
+        return preferred.asSequence()
+            .flatMap { ext -> files.filter { it.extension.equals(ext.removePrefix("."), true) }.asSequence() }
+            .maxByOrNull { it.length() }
+    }
+
+    private fun parseDiagnostics(output: String, defaultFile: String): List<Map<String, Any?>> {
+        val out = ArrayList<Map<String, Any?>>()
+        val gcc = Pattern.compile("^(.+?):(\\d+):(\\d+):\\s*(fatal error|error|warning|note):\\s*(.+)$")
+        output.lineSequence().forEach { line ->
+            val m = gcc.matcher(line.trim())
+            if (m.find()) {
+                val sev = when (m.group(4)) {
+                    "warning" -> "warning"
+                    "note" -> "info"
+                    else -> "error"
+                }
+                out += diag(sev, m.group(1) ?: defaultFile, m.group(2)?.toIntOrNull() ?: 0, m.group(3)?.toIntOrNull() ?: 0, m.group(5) ?: line)
+            }
+        }
+        return out
+    }
+
+    private fun diag(severity: String, file: String, line: Int, column: Int, message: String): Map<String, Any?> = mapOf(
+        "severity" to severity,
+        "file" to file,
+        "line" to line,
+        "column" to column,
+        "message" to message,
+    )
+
+    private fun cleanupAsync(job: File) {
+        Thread {
+            try {
+                Thread.sleep(5000)
+                job.deleteRecursively()
+            } catch (_: Exception) {
+                Log.w(TAG, "Could not clean local compiler job ${job.absolutePath}")
+            }
+        }.start()
+    }
+}
