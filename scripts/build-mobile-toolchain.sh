@@ -41,11 +41,16 @@ docker run --platform linux/arm64 --rm \
     "$CLI" config add board_manager.additional_urls "$PICO_INDEX"
     "$CLI" core update-index
     "$CLI" core install arduino:avr
+    "$CLI" core install arduino:megaavr
     "$CLI" core install rp2040:rp2040
     "$CLI" core list
 
-    mkdir -p /mnt/rootfs/work/selftest/UnoBlink /mnt/rootfs/work/selftest/PicoBlink
+    mkdir -p /mnt/rootfs/work/selftest/UnoBlink /mnt/rootfs/work/selftest/MegaBlink /mnt/rootfs/work/selftest/PicoBlink
     cat > /mnt/rootfs/work/selftest/UnoBlink/UnoBlink.ino <<EOF
+void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
+void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
+EOF
+    cat > /mnt/rootfs/work/selftest/MegaBlink/MegaBlink.ino <<EOF
 void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
 void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
 EOF
@@ -54,8 +59,10 @@ void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
 void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
 EOF
     "$CLI" compile --fqbn arduino:avr:uno --build-path /mnt/rootfs/work/selftest/uno-build /mnt/rootfs/work/selftest/UnoBlink
+    "$CLI" compile --fqbn arduino:megaavr:nona4809 --build-path /mnt/rootfs/work/selftest/mega-build /mnt/rootfs/work/selftest/MegaBlink
     "$CLI" compile --fqbn rp2040:rp2040:rpipico --build-path /mnt/rootfs/work/selftest/pico-build /mnt/rootfs/work/selftest/PicoBlink
     test -s /mnt/rootfs/work/selftest/uno-build/UnoBlink.ino.hex
+    test -s /mnt/rootfs/work/selftest/mega-build/MegaBlink.ino.hex
     test -n "$(find /mnt/rootfs/work/selftest/pico-build -type f -name "*.uf2" -print -quit)"
   '
 
@@ -65,11 +72,12 @@ chmod 0755 "$PROOT"
 file "$PROOT" | tee "${WORK}/proot-file.txt"
 grep -Eiq 'aarch64|ARM aarch64' "${WORK}/proot-file.txt"
 
-# Execute the same command the Android app will execute, inside the newly built
-# ARM64 rootfs. This catches broken dynamic-linker paths, executable permissions,
-# package paths, and PRoot mount mistakes before an APK is produced.
-mkdir -p "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-pico"
+mkdir -p "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico"
 cat > "$ROOTFS/work/FinalUno/FinalUno.ino" <<'INO'
+void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
+void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
+INO
+cat > "$ROOTFS/work/FinalMega/FinalMega.ino" <<'INO'
 void setup(){ pinMode(LED_BUILTIN, OUTPUT); }
 void loop(){ digitalWrite(LED_BUILTIN, HIGH); delay(1); digitalWrite(LED_BUILTIN, LOW); delay(1); }
 INO
@@ -82,8 +90,10 @@ cat > "$ROOTFS/work/selftest-run.sh" <<'EOF'
 set -eu
 CLI=/opt/droidvibe/bin/arduino-cli
 "$CLI" compile --fqbn arduino:avr:uno --build-path /work/final-uno /work/FinalUno
+"$CLI" compile --fqbn arduino:megaavr:nona4809 --build-path /work/final-mega /work/FinalMega
 "$CLI" compile --fqbn rp2040:rp2040:rpipico --build-path /work/final-pico /work/FinalPico
 test -s /work/final-uno/FinalUno.ino.hex
+test -s /work/final-mega/FinalMega.ino.hex
 test -n "$(find /work/final-pico -type f -name '*.uf2' -print -quit)"
 echo LOCAL_TOOLCHAIN_PRROOT_TEST_OK
 EOF
@@ -98,7 +108,7 @@ docker run --platform linux/arm64 --rm \
 printf '%s\n' "arduino-cli=${ARDUINO_CLI_VERSION}" "pico-index=${PICO_INDEX}" "proot-sha256=$(sha256sum "$PROOT" | awk '{print $1}')" > "${WORK}/manifest.txt"
 cat "${WORK}/manifest.txt"
 
-rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/selftest" "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
+rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/selftest" "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
 
 tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
 test -s "$ARCHIVE"
