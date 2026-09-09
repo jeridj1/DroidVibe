@@ -122,11 +122,17 @@ sudo rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS
 
 # The rootfs intentionally contains root-owned files with restrictive modes. Archive it
 # from a root Docker container so tar can read every file and preserve the Linux metadata.
+# Chown the resulting archive back to the GitHub runner user before leaving the container;
+# otherwise the runner cannot chmod/split the archive after Docker exits.
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 docker run --platform linux/arm64 --rm \
+  -e HOST_UID="$HOST_UID" \
+  -e HOST_GID="$HOST_GID" \
   -v "$ROOTFS:/rootfs:ro" \
   -v "$OUT:/out" \
   debian:bookworm-slim \
-  bash -lc "tar -C /rootfs --sort=name --mtime='UTC 2020-01-01' -czf /out/$(basename "$ARCHIVE") ."
+  bash -lc "tar -C /rootfs --sort=name --mtime='UTC 2020-01-01' -czf /out/$(basename "$ARCHIVE") . && chown \"${HOST_UID}:${HOST_GID}\" /out/$(basename "$ARCHIVE")"
 test -s "$ARCHIVE"
 test -s "$PROOT"
 
