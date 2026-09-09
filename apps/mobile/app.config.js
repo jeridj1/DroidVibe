@@ -34,7 +34,7 @@ try {
     });
   } catch (e2) {
     console.warn('[DroidVibe] Failed to load config plugins from @expo/config-plugins:', e2.message);
-    console.warn('[DroidVibe] Config plugins will NOT run \u2014 CI fallback patch will handle buildConfig');
+    console.warn('[DroidVibe] Config plugins will NOT run — CI fallback patch will handle buildConfig');
   }
 }
 
@@ -66,13 +66,13 @@ function getGradleProps(modResults) {
 
 function withKotlinVersion(config) {
   if (!withGradleProperties) {
-    console.warn('[DroidVibe] withGradleProperties not available \u2014 skipping Kotlin version patch');
+    console.warn('[DroidVibe] withGradleProperties not available — skipping Kotlin version patch');
     return config;
   }
   return withGradleProperties(config, (cfg) => {
     const modResults = getGradleProps(cfg.modResults);
     if (!modResults) {
-      console.warn('[DroidVibe] Could not get gradle.properties \u2014 skipping Kotlin version patch');
+      console.warn('[DroidVibe] Could not get gradle.properties — skipping Kotlin version patch');
       return cfg;
     }
     const props = modResults.properties;
@@ -113,23 +113,18 @@ function withKotlinVersion(config) {
       props.push({ key: 'org.gradle.jvmargs', value: '-Xmx3g' });
     }
 
-    console.log('[DroidVibe] withKotlinVersion plugin applied \u2014 gradle.properties patched');
+    console.log('[DroidVibe] withKotlinVersion plugin applied — gradle.properties patched');
     return cfg;
   });
 }
 
 /**
- * Enable buildFeatures.buildConfig = true in app/build.gradle.
- *
- * AGP 8.x (used by RN 0.76.x / Expo SDK 52) disables BuildConfig generation
- * by default. The prebuild-generated MainActivity.kt and MainApplication.kt
- * reference BuildConfig (e.g., for IS_NEW_ARCHITECTURE_ENABLED), so without
- * this flag the :app:compileDebugKotlin task fails with
- * "Unresolved reference: BuildConfig".
+ * Enable BuildConfig, normalize namespace, and prevent AGP from buffering the
+ * already-compressed local Arduino toolchain archive into one giant byte[].
  */
 function withBuildConfigEnabled(config) {
   if (!withAppBuildGradle) {
-    console.warn('[DroidVibe] withAppBuildGradle not available \u2014 skipping BuildConfig + namespace patch');
+    console.warn('[DroidVibe] withAppBuildGradle not available — skipping BuildConfig + namespace patch');
     return config;
   }
   return withAppBuildGradle(config, (cfg) => {
@@ -166,6 +161,19 @@ function withBuildConfigEnabled(config) {
       }
     } else {
       console.log('[DroidVibe] buildConfig = true already present in app/build.gradle');
+    }
+
+    // The toolchain rootfs is already gzip-compressed. Tell AGP to store .gz
+    // assets uncompressed in the APK so Zipflinger does not read the whole
+    // multi-gigabyte expanded asset into one Java byte array.
+    if (!/noCompress\s*\+?=?.*['\"]gz['\"]/.test(contents)) {
+      if (/androidResources\s*{/.test(contents)) {
+        contents = contents.replace(/(androidResources\s*{)/, '$1\n        noCompress += ["gz"]');
+      } else if (/android\s*{/.test(contents)) {
+        contents = contents.replace(/(android\s*{)/, '$1\n    androidResources {\n        noCompress += ["gz"]\n    }');
+      }
+      console.log('[DroidVibe] Added androidResources.noCompress for gz toolchain archive');
+      modified = true;
     }
 
     if (modified) {
