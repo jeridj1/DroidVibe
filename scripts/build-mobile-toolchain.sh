@@ -120,11 +120,17 @@ cat "${WORK}/manifest.txt"
 
 sudo rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
 
-sudo tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
-sudo chmod 0644 "$ARCHIVE"
+# The rootfs intentionally contains root-owned files with restrictive modes. Archive it
+# from a root Docker container so tar can read every file and preserve the Linux metadata.
+docker run --platform linux/arm64 --rm \
+  -v "$ROOTFS:/rootfs:ro" \
+  -v "$OUT:/out" \
+  debian:bookworm-slim \
+  bash -lc "tar -C /rootfs --sort=name --mtime='UTC 2020-01-01' -czf /out/$(basename "$ARCHIVE") ."
 test -s "$ARCHIVE"
 test -s "$PROOT"
 
+chmod 0644 "$ARCHIVE"
 split -b 128M -d -a 3 "$ARCHIVE" "$PART_PREFIX"
 rm -f "$ARCHIVE"
 for part in "${PART_PREFIX}"*; do chmod 0644 "$part"; done
