@@ -11,10 +11,10 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.SequenceInputStream
 import java.nio.file.Files
-import java.util.Vector
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import java.util.zip.GZIPInputStream
+import java.util.Vector
 
 /** Runs a real Arduino CLI toolchain locally on the Android device. */
 object LocalToolchain {
@@ -22,7 +22,7 @@ object LocalToolchain {
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_ROOTFS_PART_PREFIX = "droidvibe-toolchain-rootfs.tar.gz.part-"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix-persistent-cli-state"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -53,7 +53,7 @@ object LocalToolchain {
             dest.parentFile?.mkdirs(); dest.writeText(content, Charsets.UTF_8)
         }
         val command = cliCommand(root, listOf("compile", "--fqbn", fqbn, "--build-path", "/work/build", "--warnings", "all", "/work/$safeName"), job)
-        val process = startProcess(command, job)
+        val process = startProcess(command, job, root)
         val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (!process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
             process.destroyForcibly()
@@ -72,7 +72,7 @@ object LocalToolchain {
         require(timeoutMinutes > 0) { "timeoutMinutes must be positive" }
         val root = ensureInstalled(context)
         val work = File(context.cacheDir, "cli-${System.currentTimeMillis()}").apply { mkdirs() }
-        val process = startProcess(cliCommand(root, args, work), work)
+        val process = startProcess(cliCommand(root, args, work), work, root)
         val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (!process.waitFor(timeoutMinutes, TimeUnit.MINUTES)) {
             process.destroyForcibly(); cleanupAsync(work)
@@ -164,11 +164,13 @@ object LocalToolchain {
         add("-b"); add("${work.absolutePath}:/work"); add("--kill-on-exit"); add("/opt/droidvibe/bin/arduino-cli"); addAll(args)
     }
 
-    private fun startProcess(command: List<String>, work: File): Process = ProcessBuilder(command).directory(work).redirectErrorStream(true).apply {
+    private fun startProcess(command: List<String>, work: File, root: InstalledPaths): Process = ProcessBuilder(command).directory(work).redirectErrorStream(true).apply {
         environment()["HOME"] = "/root"
         environment()["PATH"] = "/opt/droidvibe/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         environment()["ARDUINO_DATA_DIR"] = "/opt/droidvibe/data"
-        environment()["ARDUINO_USER_DIR"] = "/work/user"
+        // Keep Board Manager indexes, installed cores, and package configuration across CLI invocations.
+        // The previous /work/user setting made every Board Manager operation disposable.
+        environment()["ARDUINO_USER_DIR"] = "/opt/droidvibe/user"
         environment()["TMPDIR"] = "/work/tmp"
         environment()["LC_ALL"] = "C"
         environment()["LANG"] = "C"
