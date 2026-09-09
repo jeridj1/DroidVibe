@@ -22,7 +22,7 @@ object LocalToolchain {
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_ROOTFS_PART_PREFIX = "droidvibe-toolchain-rootfs.tar.gz.part-"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -49,7 +49,7 @@ object LocalToolchain {
             val clean = relativePath.replace('\\', '/').removePrefix("/")
             if (clean.isBlank() || clean.split('/').any { it == ".." }) throw SecurityException("Invalid sketch path")
             val dest = File(sketchDir, clean)
-            if (!dest.canonicalPath.startsWith(sketchDir.canonicalPath + File.separator)) throw SecurityException("Sketch path escaped workspace")
+            if (!dest.absolutePath.startsWith(sketchDir.absolutePath + File.separator)) throw SecurityException("Sketch path escaped workspace")
             dest.parentFile?.mkdirs(); dest.writeText(content, Charsets.UTF_8)
         }
         val command = cliCommand(root, listOf("compile", "--fqbn", fqbn, "--build-path", "/work/build", "--warnings", "all", "/work/$safeName"), job)
@@ -105,18 +105,33 @@ object LocalToolchain {
                         val clean = current.name.removePrefix("/")
                         if (clean.isBlank() || clean.split('/').any { it == ".." }) throw SecurityException("Invalid toolchain archive path")
                         val out = File(rootfs, clean)
-                        if (!out.canonicalPath.startsWith(rootfs.canonicalPath + File.separator)) throw SecurityException("Toolchain archive escaped rootfs")
+                        val safeAbsolute = out.absolutePath == rootfs.absolutePath || out.absolutePath.startsWith(rootfs.absolutePath + File.separator)
+                        if (!safeAbsolute) throw SecurityException("Toolchain archive escaped rootfs")
                         when {
                             current.isDirectory -> out.mkdirs()
                             current.isSymbolicLink -> {
-                                out.parentFile?.mkdirs(); val target = current.linkName
-                                if (target.isBlank()) throw SecurityException("Invalid toolchain symlink")
-                                runCatching { Files.deleteIfExists(out.toPath()) }; Files.createSymbolicLink(out.toPath(), File(target).toPath())
+                                out.parentFile?.mkdirs()
+                                val linkName = current.linkName
+                                if (linkName.isBlank()) throw SecurityException("Invalid toolchain symlink")
+                                val linkTarget = if (linkName.startsWith("/")) {
+                                    val target = File(rootfs, linkName.removePrefix("/"))
+                                    if (!target.absolutePath.startsWith(rootfs.absolutePath + File.separator) && target.absolutePath != rootfs.absolutePath) throw SecurityException("Invalid absolute symlink target")
+                                    out.parentFile.toPath().relativize(target.toPath()).toString()
+                                } else {
+                                    if (linkName.split('/').any { it == ".." }) throw SecurityException("Invalid relative symlink target")
+                                    linkName
+                                }
+                                runCatching { Files.deleteIfExists(out.toPath()) }
+                                Files.createSymbolicLink(out.toPath(), File(linkTarget).toPath())
                             }
                             current.isLink -> {
-                                out.parentFile?.mkdirs(); val targetName = current.linkName.removePrefix("/"); val target = File(rootfs, targetName)
-                                if (!target.canonicalPath.startsWith(rootfs.canonicalPath + File.separator)) throw SecurityException("Invalid hard link target")
-                                runCatching { Files.deleteIfExists(out.toPath()) }; Files.createLink(out.toPath(), target.toPath())
+                                out.parentFile?.mkdirs()
+                                val targetName = current.linkName.removePrefix("/")
+                                if (targetName.isBlank() || targetName.split('/').any { it == ".." }) throw SecurityException("Invalid hard link target")
+                                val target = File(rootfs, targetName)
+                                if (!target.absolutePath.startsWith(rootfs.absolutePath + File.separator)) throw SecurityException("Invalid hard link target")
+                                runCatching { Files.deleteIfExists(out.toPath()) }
+                                Files.createLink(out.toPath(), target.toPath())
                             }
                             else -> {
                                 out.parentFile?.mkdirs(); FileOutputStream(out).use { fos -> tar.copyTo(fos) }
