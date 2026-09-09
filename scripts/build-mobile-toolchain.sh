@@ -7,10 +7,12 @@ WORK="${RUNNER_TEMP:-/tmp}/droidvibe-toolchain"
 ROOTFS="${WORK}/rootfs"
 ARCHIVE="${OUT}/droidvibe-toolchain-rootfs.tar.gz"
 PROOT="${OUT}/droidvibe-toolchain-proot"
+PART_PREFIX="${ARCHIVE}.part-"
 ARDUINO_CLI_VERSION="1.5.1"
 PICO_INDEX="https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
 
 rm -rf "$WORK"
+rm -f "$ARCHIVE" "${PART_PREFIX}"*
 mkdir -p "$ROOTFS/opt/droidvibe/bin" "$OUT"
 
 docker pull --platform linux/arm64 debian:bookworm-slim >/dev/null
@@ -122,4 +124,11 @@ sudo tar -C "$ROOTFS" --sort=name --mtime='UTC 2020-01-01' -czf "$ARCHIVE" .
 sudo chmod 0644 "$ARCHIVE"
 test -s "$ARCHIVE"
 test -s "$PROOT"
-ls -lh "$ARCHIVE" "$PROOT"
+
+split -b 128M -d -a 3 "$ARCHIVE" "$PART_PREFIX"
+rm -f "$ARCHIVE"
+for part in "${PART_PREFIX}"*; do chmod 0644 "$part"; done
+part_count=$(find "$OUT" -maxdepth 1 -type f -name 'droidvibe-toolchain-rootfs.tar.gz.part-*' | wc -l)
+test "$part_count" -gt 1
+ls -lh "$PROOT" "${PART_PREFIX}"*
+echo "TOOLCHAIN_ARCHIVE_SPLIT_OK parts=$part_count"
