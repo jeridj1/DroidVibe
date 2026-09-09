@@ -146,14 +146,14 @@ jobs:
         run: |
           chmod +x scripts/build-mobile-toolchain.sh
           scripts/build-mobile-toolchain.sh "$RUNNER_TEMP/droidvibe-assets"
-          test -s "$RUNNER_TEMP/droidvibe-assets/droidvibe-toolchain-rootfs.tar.gz"
           test -s "$RUNNER_TEMP/droidvibe-assets/droidvibe-toolchain-proot"
+          compgen -G "$RUNNER_TEMP/droidvibe-assets/droidvibe-toolchain-rootfs.tar.gz.part-*" >/dev/null
       - name: Upload verified toolchain
         uses: actions/upload-artifact@v4
         with:
           name: droidvibe-local-toolchain
           path: |
-            ${{ runner.temp }}/droidvibe-assets/droidvibe-toolchain-rootfs.tar.gz
+            ${{ runner.temp }}/droidvibe-assets/droidvibe-toolchain-rootfs.tar.gz.part-*
             ${{ runner.temp }}/droidvibe-assets/droidvibe-toolchain-proot
           if-no-files-found: error
           retention-days: 30
@@ -201,8 +201,8 @@ jobs:
           path: apps/mobile/android/app/src/main/assets
       - name: Verify bundled toolchain files
         run: |
-          test -s apps/mobile/android/app/src/main/assets/droidvibe-toolchain-rootfs.tar.gz
           test -s apps/mobile/android/app/src/main/assets/droidvibe-toolchain-proot
+          compgen -G 'apps/mobile/android/app/src/main/assets/droidvibe-toolchain-rootfs.tar.gz.part-*' >/dev/null
       - name: Build RP2040 logic analyzer helper
         env:
           PICO_SDK_VERSION: 2.1.1
