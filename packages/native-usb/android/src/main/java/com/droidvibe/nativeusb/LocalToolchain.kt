@@ -7,7 +7,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import java.io.BufferedInputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.SequenceInputStream
@@ -23,7 +22,7 @@ object LocalToolchain {
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_ROOTFS_PART_PREFIX = "droidvibe-toolchain-rootfs.tar.gz.part-"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -138,21 +137,11 @@ object LocalToolchain {
         val names = context.assets.list("")?.filter { it.startsWith(ASSET_ROOTFS_PART_PREFIX) }?.sorted() ?: emptyList()
         return if (names.isNotEmpty()) {
             val streams = Vector<InputStream>(names.size)
-            for (name in names) streams.add(FileInputStream(copyAssetToTemp(context, name)))
+            for (name in names) streams.add(context.assets.open(name))
             SequenceInputStream(streams.elements())
         } else {
             context.assets.open(ASSET_ROOTFS)
         }
-    }
-
-    private fun copyAssetToTemp(context: Context, asset: String): File {
-        val tempDir = File(context.cacheDir, "droidvibe-archive-parts").apply { mkdirs() }
-        val safe = asset.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val target = File(tempDir, safe)
-        if (!target.isFile || target.length() == 0L) {
-            context.assets.open(asset).use { input -> FileOutputStream(target).use { output -> input.copyTo(output, 64 * 1024) } }
-        }
-        return target
     }
 
     private fun cliCommand(root: InstalledPaths, args: List<String>, work: File): List<String> = buildList {
