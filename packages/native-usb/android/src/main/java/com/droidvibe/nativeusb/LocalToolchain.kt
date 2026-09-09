@@ -7,8 +7,12 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.SequenceInputStream
 import java.nio.file.Files
+import java.util.Vector
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import java.util.zip.GZIPInputStream
@@ -17,8 +21,9 @@ import java.util.zip.GZIPInputStream
 object LocalToolchain {
     private const val TAG = "DroidVibeLocalToolchain"
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
+    private const val ASSET_ROOTFS_PART_PREFIX = "droidvibe-toolchain-rootfs.tar.gz.part-"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -92,7 +97,7 @@ object LocalToolchain {
         root.mkdirs(); extractAsset(context, ASSET_PROOT, proot)
         if (!proot.setExecutable(true, false)) throw IllegalStateException("Android refused to mark the local compiler runtime executable")
         rootfs.mkdirs()
-        context.assets.open(ASSET_ROOTFS).use { input ->
+        openRootfsAssetStream(context).use { input ->
             GZIPInputStream(BufferedInputStream(input, 64 * 1024)).use { gzip ->
                 TarArchiveInputStream(BufferedInputStream(gzip, 64 * 1024)).use { tar ->
                     var entry: TarArchiveEntry? = tar.nextTarEntry
@@ -127,6 +132,27 @@ object LocalToolchain {
         }
         marker.writeText(VERSION, Charsets.UTF_8)
         return InstalledPaths(root, rootfs, proot)
+    }
+
+    private fun openRootfsAssetStream(context: Context): InputStream {
+        val names = context.assets.list("")?.filter { it.startsWith(ASSET_ROOTFS_PART_PREFIX) }?.sorted() ?: emptyList()
+        return if (names.isNotEmpty()) {
+            val streams = Vector<InputStream>(names.size)
+            for (name in names) streams.add(FileInputStream(copyAssetToTemp(context, name)))
+            SequenceInputStream(streams.elements())
+        } else {
+            context.assets.open(ASSET_ROOTFS)
+        }
+    }
+
+    private fun copyAssetToTemp(context: Context, asset: String): File {
+        val tempDir = File(context.cacheDir, "droidvibe-archive-parts").apply { mkdirs() }
+        val safe = asset.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val target = File(tempDir, safe)
+        if (!target.isFile || target.length() == 0L) {
+            context.assets.open(asset).use { input -> FileOutputStream(target).use { output -> input.copyTo(output, 64 * 1024) } }
+        }
+        return target
     }
 
     private fun cliCommand(root: InstalledPaths, args: List<String>, work: File): List<String> = buildList {
