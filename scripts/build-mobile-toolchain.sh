@@ -120,13 +120,14 @@ cat "${WORK}/manifest.txt"
 
 sudo rm -rf "$ROOTFS/root/.cache" "$ROOTFS/var/log" "$ROOTFS/var/tmp"/* "$ROOTFS/work/FinalUno" "$ROOTFS/work/FinalMega" "$ROOTFS/work/FinalPico" "$ROOTFS/work/final-uno" "$ROOTFS/work/final-mega" "$ROOTFS/work/final-pico" "$ROOTFS/work/selftest-run.sh"
 
-# The rootfs intentionally contains root-owned files with restrictive modes. Archive it
-# from a root Docker container so tar can read every file and preserve the Linux metadata.
+# Stream the archive through the host shell instead of creating it on the bind mount.
+# This makes the resulting file owned by the GitHub runner, avoiding Docker/root
+# ownership restrictions on hosted ARM64 runners.
 docker run --platform linux/arm64 --rm \
   -v "$ROOTFS:/rootfs:ro" \
-  -v "$OUT:/out" \
   debian:bookworm-slim \
-  bash -lc "tar -C /rootfs --sort=name --mtime='UTC 2020-01-01' -czf /out/$(basename "$ARCHIVE") ."
+  bash -lc "tar -C /rootfs --sort=name --mtime='UTC 2020-01-01' -czf - ." \
+  > "$ARCHIVE"
 test -s "$ARCHIVE"
 test -s "$PROOT"
 
