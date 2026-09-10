@@ -22,7 +22,7 @@ object LocalToolchain {
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_ROOTFS_PART_PREFIX = "droidvibe-toolchain-rootfs.tar.gz.part-"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix-persistent-cli-state"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix-persistent-cli-state-safe-symlinks"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -113,25 +113,30 @@ object LocalToolchain {
                                 out.parentFile?.mkdirs()
                                 val linkName = current.linkName
                                 if (linkName.isBlank()) throw SecurityException("Invalid toolchain symlink")
-                                val linkTarget = if (linkName.startsWith("/")) {
-                                    val target = File(rootfs, linkName.removePrefix("/"))
-                                    if (!target.absolutePath.startsWith(rootfs.absolutePath + File.separator) && target.absolutePath != rootfs.absolutePath) throw SecurityException("Invalid absolute symlink target")
-                                    out.parentFile.toPath().relativize(target.toPath()).toString()
+                                val rootPath = rootfs.toPath().toAbsolutePath().normalize()
+                                val targetPath = if (linkName.startsWith("/")) {
+                                    rootPath.resolve(linkName.removePrefix("/")).normalize()
                                 } else {
-                                    if (linkName.split('/').any { it == ".." }) throw SecurityException("Invalid relative symlink target")
-                                    linkName
+                                    out.parentFile.toPath().toAbsolutePath().normalize().resolve(linkName).normalize()
                                 }
+                                if (targetPath != rootPath && !targetPath.startsWith(rootPath)) {
+                                    throw SecurityException("Invalid toolchain symlink target")
+                                }
+                                val linkTarget = out.parentFile.toPath().toAbsolutePath().normalize().relativize(targetPath).toString()
                                 runCatching { Files.deleteIfExists(out.toPath()) }
-                                Files.createSymbolicLink(out.toPath(), File(linkTarget).toPath())
+                                Files.createSymbolicLink(out.toPath(), java.nio.file.Paths.get(linkTarget))
                             }
                             current.isLink -> {
                                 out.parentFile?.mkdirs()
-                                val targetName = current.linkName.removePrefix("/")
-                                if (targetName.isBlank() || targetName.split('/').any { it == ".." }) throw SecurityException("Invalid hard link target")
-                                val target = File(rootfs, targetName)
-                                if (!target.absolutePath.startsWith(rootfs.absolutePath + File.separator)) throw SecurityException("Invalid hard link target")
+                                val rootPath = rootfs.toPath().toAbsolutePath().normalize()
+                                val targetPath = if (current.linkName.startsWith("/")) {
+                                    rootPath.resolve(current.linkName.removePrefix("/")).normalize()
+                                } else {
+                                    out.parentFile.toPath().toAbsolutePath().normalize().resolve(current.linkName).normalize()
+                                }
+                                if (targetPath == rootPath || !targetPath.startsWith(rootPath)) throw SecurityException("Invalid hard link target")
                                 runCatching { Files.deleteIfExists(out.toPath()) }
-                                Files.createLink(out.toPath(), target.toPath())
+                                Files.createLink(out.toPath(), targetPath)
                             }
                             else -> {
                                 out.parentFile?.mkdirs(); FileOutputStream(out).use { fos -> tar.copyTo(fos) }
@@ -168,8 +173,6 @@ object LocalToolchain {
         environment()["HOME"] = "/root"
         environment()["PATH"] = "/opt/droidvibe/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         environment()["ARDUINO_DATA_DIR"] = "/opt/droidvibe/data"
-        // Keep Board Manager indexes, installed cores, and package configuration across CLI invocations.
-        // The previous /work/user setting made every Board Manager operation disposable.
         environment()["ARDUINO_USER_DIR"] = "/opt/droidvibe/user"
         environment()["TMPDIR"] = "/work/tmp"
         environment()["LC_ALL"] = "C"
