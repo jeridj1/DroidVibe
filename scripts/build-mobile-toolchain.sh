@@ -130,10 +130,11 @@ docker run --platform linux/arm64 --rm \
 test -s "$ARCHIVE"
 test -s "$PROOT"
 
-chmod 0644 "$ARCHIVE"
+# The archive is intentionally created by the root Docker container. Do not chmod it
+# from the host runner, because the mounted file can remain root-owned and immutable to
+# the runner even though it is readable. split only needs read access to the archive.
 split -b 128M -d -a 3 "$ARCHIVE" "$PART_PREFIX"
 rm -f "$ARCHIVE"
-for part in "${PART_PREFIX}"*; do chmod 0644 "$part"; done
 part_count=$(find "$OUT" -maxdepth 1 -type f -name 'droidvibe-toolchain-rootfs.tar.gz.part-*' | wc -l)
 test "$part_count" -gt 1
 ls -lh "$PROOT" "${PART_PREFIX}"*
