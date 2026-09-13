@@ -22,7 +22,7 @@ object LocalToolchain {
     private const val ASSET_ROOTFS = "droidvibe-toolchain-rootfs.tar.gz"
     private const val ASSET_ROOTFS_PART_PREFIX = "droidvibe-toolchain-rootfs.tar.gz.part-"
     private const val ASSET_PROOT = "droidvibe-toolchain-proot"
-    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix2"
+    private const val VERSION = "2026-09-local-cli-1.5.1-avr-megaavr-pico6.1-python3-chunked-stream-symlinkfix3"
     private const val MARKER = ".installed"
     private const val TIMEOUT_MINUTES = 5L
 
@@ -113,18 +113,20 @@ object LocalToolchain {
                                 out.parentFile?.mkdirs()
                                 val linkName = current.linkName
                                 if (linkName.isBlank()) throw SecurityException("Invalid toolchain symlink")
-                                val rootRelativeTop = linkName.substringBefore('/').lowercase()
-                                val linkTarget = if (linkName.startsWith("/")) {
-                                    val target = File(rootfs, linkName.removePrefix("/"))
+                                var normalizedLinkName = linkName
+                                while (normalizedLinkName.startsWith("./")) normalizedLinkName = normalizedLinkName.removePrefix("./")
+                                val rootRelativeTop = normalizedLinkName.substringBefore('/').lowercase()
+                                val linkTarget = if (normalizedLinkName.startsWith("/")) {
+                                    val target = File(rootfs, normalizedLinkName.removePrefix("/"))
                                     if (!target.absolutePath.startsWith(rootfs.absolutePath + File.separator) && target.absolutePath != rootfs.absolutePath) throw SecurityException("Invalid absolute symlink target")
                                     out.parentFile.toPath().relativize(target.toPath()).toString()
                                 } else if (rootRelativeTop in setOf("bin", "sbin", "lib", "lib64", "usr", "opt", "etc", "var", "home", "root", "tmp", "work")) {
-                                    val target = File(rootfs, linkName)
+                                    val target = File(rootfs, normalizedLinkName)
                                     if (!target.absolutePath.startsWith(rootfs.absolutePath + File.separator) && target.absolutePath != rootfs.absolutePath) throw SecurityException("Invalid root-relative symlink target")
                                     out.parentFile.toPath().relativize(target.toPath()).toString()
                                 } else {
-                                    if (linkName.split('/').any { it == ".." }) throw SecurityException("Invalid relative symlink target")
-                                    linkName
+                                    if (normalizedLinkName.split('/').any { it == ".." }) throw SecurityException("Invalid relative symlink target")
+                                    normalizedLinkName
                                 }
                                 runCatching { Files.deleteIfExists(out.toPath()) }
                                 Files.createSymbolicLink(out.toPath(), File(linkTarget).toPath())
