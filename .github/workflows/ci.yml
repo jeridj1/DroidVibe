@@ -275,7 +275,6 @@ jobs:
       - name: Bundle JavaScript
         working-directory: apps/mobile
         run: |
-          pnpm add -D @react-native-community/cli@latest 2>&1 | tee /tmp/bundle-output.txt
           echo "import 'expo-router/entry';" > index.js
           mkdir -p android/app/src/main/assets
           pnpm exec react-native bundle \
@@ -285,7 +284,7 @@ jobs:
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res/ \
             --max-workers 2 \
-            --verbose 2>&1 | tee -a /tmp/bundle-output.txt
+            --verbose 2>&1 | tee /tmp/bundle-output.txt
           code=${PIPESTATUS[0]}
           rm -f index.js
           [ $code -eq 0 ] || exit $code
