@@ -30,23 +30,29 @@ Known relevant PR: #122
 
 `MANIFEST.md` explains what is and is not intentionally included.
 
+`AI_ACCESS_GUIDE.md` explains how reviewers with different GitHub/web capabilities can use the dossier without write access.
+
 `REPOSITORY_BASELINE.md` records the baseline stack and known discrepancies.
 
 `SOURCE_MAP.md` points reviewers toward the highest-value native Android, mobile, shared, backend, firmware, and CI files.
 
-`KEY_SOURCE_SNAPSHOTS.md` exposes critical implementation details for AIs whose GitHub browsing is limited.
+`KEY_SOURCE_SNAPSHOTS.md` exposes compact critical implementation/configuration facts for AIs whose GitHub browsing is limited.
 
 `CI-RUN-34722004569.md` preserves the important failed-toolchain sequence, including the successful ARM64/proot compilation self-test followed by the archive chmod failure.
 
 `USER_REPORTED_REALITY.md` records the owner's real-device observations and product target. Those observations are explicitly labeled as unverified until independently reproduced.
 
+`CURRENT_DEVICE_ERROR.md` records the newer approximate `invalid relative system link target`-type compile error and directs reviewers toward the toolchain/symlink path.
+
 `KNOWN_FAILURES.md` and `PR-122-EVIDENCE.md` preserve earlier high-value findings about the toolchain and proposed fix.
+
+`ARDUINODROID_REFERENCE.md` records the current public ArduinoDroid feature baseline so reviewers can compare proven Android Arduino workflow behavior without assuming its internal implementation.
 
 `REPORT_TEMPLATE.md` gives reviewers a common report format so multiple independent AI reports can be compared later.
 
 ## Product target
 
-The goal is not merely a green CI badge or an APK that installs. DroidVibe is intended to be a practical Android Arduino workstation. The owner reports that the existing Arduino app available from the Play Store works for the basic workflow; DroidVibe is intended to retain that practicality while adding local/offline compilation, broader USB flashing and serial support, RP2040 logic-analyzer capability, AI assistance, and eventually deeper programmer/debugger functions.
+The goal is not merely a green CI badge or an APK that installs. DroidVibe is intended to be a practical Android Arduino workstation. The owner reports that the existing ArduinoDroid app available from the Play Store works for the basic workflow; DroidVibe is intended to retain that practicality while adding local/offline compilation, broader USB flashing and serial support, RP2040 logic-analyzer capability, AI assistance, and eventually deeper programmer/debugger functions.
 
 ## Public-data warning
 
